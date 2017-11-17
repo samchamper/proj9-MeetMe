@@ -4,45 +4,33 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <link rel="stylesheet" type="text/css"
-     href="//cdn.jsdelivr.net/bootstrap/latest/css/bootstrap.css"
-/>
+     href="//cdn.jsdelivr.net/bootstrap/latest/css/bootstrap.css"/>
 
 
 <link rel="stylesheet" type="text/css"
-    href="/static/css/busy.css"
-/>
+    href="/static/css/busy.css"/>
 
 <!-- jquery from a content distribution network; probably cached -->
 <script type="text/javascript"
      src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js">
 </script>
 
-<!-- Ideally the rest of our javascript dependencies would be
-     bundled and minified with 'browserify', but I've found that
-     it difficult to handle browserify dependencies for class
-     projects.  So, we'll pick up moment and a date range picker
-     from CDNs instead.
--->
-
+<!-- Moment and a date range picker -->
 <script type="text/javascript" src="//cdn.jsdelivr.net/momentjs/latest/moment.min.js"></script>
 
 <script type="text/javascript" src="//cdn.jsdelivr.net/bootstrap.daterangepicker/2/daterangepicker.js"></script>
 <link rel="stylesheet" type="text/css" href="//cdn.jsdelivr.net/bootstrap.daterangepicker/2/daterangepicker.css" />
-
-
 </head>
 
 <body>
 <div class="container">
 
 <h1>Busy times</h1>
-
+<br />
 <!--
   -- If there are any warnings or other messages from a prior action,
-  -- they appear above the rest of the content, just until the next 
-  -- action.
+  -- they appear above the rest of the content, until the next action.
   -->
-
 {% with messages = get_flashed_messages() %}
   {% if messages %}
     <ul class=flashes>
@@ -53,7 +41,7 @@
   {% endif %}
 {% endwith %}
 
-<h2>Date range</h2>
+  <label> Date range:  </label>
   <form action="/setrange" method="post">
   <input type="text" name="daterange" size="12"
     {% if session.daterange is defined %}
@@ -68,7 +56,7 @@
     {    ranges: {
            'Today': [moment(), moment()],
            'Tomorrow':[moment().add(1, 'days'),
-                       moment().add(1, 'days')], 
+                       moment().add(1, 'days')],
            'This week':[moment(), moment().endOf('week')],
            'Next week':[moment().add(7, 'days').startOf('week'),
                         moment().add(7, 'days').endOf('week')],
@@ -78,29 +66,130 @@
        );
     });
   </script>
-
-<br /><input type="submit" value="Choose" />
+      <br /><br />
+      <label> Time range (HH:MM AM/PM or 24hour HH:MM): </label>
+      <input type="text" name="open" id="open" size="10"
+             {% if session.begin_time is defined %}
+                value="{{session.begin_time}}"
+             {% else %}
+                value="9:00 AM"
+             {% endif %}>
+      <input type="text" name="close" id="close" size="10"
+             {% if session.end_time is defined %}
+                value="{{session.end_time}}"
+             {% else %}
+                value="5:00 PM"
+             {% endif %}>
+<br /><br /><input id="go" type="submit" value="Go!" />
 </form>
 
-    <!--
-    Show the calendar list (if we have it).  This will need to be turned into
-    a form from which calendars can be picked. Up to three entries are
-    shown in each row (but the order is across then down; I would
-    prefer down then across). 
-    -->
-{% if g.calendars is defined  %}
-  <div class="row">
-  {% for cal in g.calendars if cal.selected %}
-          <div class="col-md-4">
-	   {{ cal.summary }}
-          </div>
-         {% if loop.index is divisibleby 3 %}
-          </div> <div class="row">
-         {% endif %}
-  {% endfor %}
-  </div>
-{% endif %}
-    
 
-  </div>  <!-- container (for bootstrap) -->
-  </body> </html>
+
+    <h2>Calendars: </h2>
+<!-- Table to be filled in by js functions -->
+<table class="cal_table" id="cal_table">
+    <label> Select calendars from which to populate event table:  </label>
+</table>
+<br />
+    <h2>Events from selected calendars: </h2>
+<!-- Table to be filled in by js functions -->
+<table class="event_table" id="event_table">
+    <tbody>
+    </tbody>
+</table>
+
+<script type="text/javascript">
+var SCRIPT_ROOT = {{request.script_root|tojson|safe}} ;
+var CHOOSE_URL = SCRIPT_ROOT + "/_choose";
+var EVENT_URL = SCRIPT_ROOT + "/_events";
+
+function populate_cal_table(){
+    $.getJSON(CHOOSE_URL, {}, function(data) {
+        console.log("Populating table with calandars and checkboxes.");
+        var cals = data.result.cal_list;
+
+        var cal_tab = document.getElementById('cal_table');
+        var num_cals = cals.length;
+        for (var i = 0; i < num_cals; i++) {
+            cal_tab.insertRow().outerHTML = "<tr class='the_row'> <input name='checkbox' type='checkbox' id='check" + i + "'> " + cals[i].summary +
+                "<input name='value' id='calendar_number_" + i + "' value ='" + cals[i].summary + "' readonly style='visibility:hidden'> </tr>";
+        }
+        populate_event_table();
+    });
+}
+
+function populate_event_table(){
+    var cal_tab = document.getElementById('cal_table');
+    var leng = cal_tab.rows.length;
+    chosen_cals = [];
+    for (var i = 0; i < leng; i++){
+//        var thisrow = cal_tab.rows[i];
+        var chkname = "check" + i;
+        var chk = document.getElementById(chkname);
+        var cal_name = "calendar_number_" + i;
+        var thiscal = document.getElementById(cal_name).value;
+        if (chk.checked){
+            chosen_cals.push(thiscal)
+        }
+    }
+    console.log("The following calendars have been selected: " + chosen_cals);
+
+    $.getJSON(EVENT_URL, {chosen_cals: chosen_cals}, function(data) {
+        console.log("Populating event list.");
+        var events = data.result.event_list;
+        var table = document.getElementById('event_table');
+        while (table.firstChild) {
+            table.removeChild(table.firstChild);
+        }
+        var e_table = document.createElement('tbody');
+        table.appendChild(e_table);
+        var len = events.length;
+        for (var i = 0; i < len; i++) {
+            e_table.insertRow().outerHTML = "<tr>" + events[i] + "</tr>";
+        }
+
+    });
+}
+
+
+// Next line from
+// https://stackoverflow.com/questions/22234363/how-to-make-event-listener-for-changes-in-all-and-any-check-boxes-in-document-wi
+$(document).on('change', 'input[type=checkbox]', function(e) {
+    populate_event_table();
+});
+
+
+  $(document).ready(function(){
+        console.log("Page loaded");
+        populate_cal_table();
+  });
+
+
+//    TRASH  TRASH  TRASH  TRASH  TRASH  TRASH  TRASH  TRASH
+//  TRASH  TRASH  TRASH  TRASH  TRASH  TRASH  TRASH  TRASH
+//TRASH  TRASH  TRASH  TRASH  TRASH  TRASH  TRASH  TRASH
+//
+//
+  //            console.log(cal_tab.rows.length);
+//            console.log(cal_tab.rows[i][0]);
+//
+//            create_listener();
+//
+//            checkbox = document.querySelector("input[name=checkbox]");
+//
+//            checkbox.addEventListener('change', function() {
+//                populate_event_table();
+//            });
+
+//            var cur_row = cal_tab.rows[i].childNodes;
+//            var chkbx = $(cur_row[0]).parents(".the_row").find("input[name='checkbox']");
+//            $('chkbx').click(function(){
+//                populate_event_table();
+//            });
+//            make_listener(chkbx, cals[i].summary);
+
+</script>
+
+  </div>  <!--for bootstrap-->
+  </body>
+  </html>
