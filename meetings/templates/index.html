@@ -121,7 +121,7 @@ function populate_cal_table(){
 function populate_event_table(){
     var cal_tab = document.getElementById('cal_table');
     var leng = cal_tab.rows.length;
-    chosen_cals = [];
+    chosen = [];
     for (var i = 0; i < leng; i++){
 //        var thisrow = cal_tab.rows[i];
         var chkname = "check" + i;
@@ -129,12 +129,11 @@ function populate_event_table(){
         var cal_name = "calendar_number_" + i;
         var thiscal = document.getElementById(cal_name).value;
         if (chk.checked){
-            chosen_cals.push(thiscal)
+            chosen.push(thiscal)
         }
     }
-    console.log("The following calendars have been selected: " + chosen_cals);
-
-    $.getJSON(EVENT_URL, {chosen_cals: chosen_cals}, function(data) {
+    console.log("The following calendars have been selected: " + chosen);
+    $.getJSON(EVENT_URL, {chosen: JSON.stringify(chosen)}, function(data){
         console.log("Populating event list.");
         var events = data.result.event_list;
         var table = document.getElementById('event_table');

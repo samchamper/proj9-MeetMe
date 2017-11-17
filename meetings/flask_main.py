@@ -105,27 +105,52 @@ def events():
     for i in cal_list:
         i['selected'] = True
     flask.g.calendars = cal_list
-    chosen = request.args.get('chosen_cals')
 
     print("\n\n\n\n\n\n WE ARE IN PYTHON NOW \n\n\n")
-    event_list = []
-    # flask.session['begin_date'] +
-    # flask.session['begin_time'] +
-    # flask.session['end_date'] +
-    # flask.session['end_time']
+    chosen = request.args.get("chosen")
+    app.logger.debug("The following calendars have been chosen: {}".format(chosen))
+
+    # Get the range of days we are interested in
     begin = arrow.get(flask.session['begin_date'])
     end = arrow.get(flask.session['end_date'])
-
-    open = interpret_time(flask.session['begin_time'])
-    close = interpret_time(flask.session['end_time'])
-
-    print(open)
-    print(close)
-
     day_range = arrow.Arrow.range('day', begin, end)
 
+    # Manipulate open and close times to get hours and minutes.
+    open = interpret_time(flask.session['begin_time'])
+    close = interpret_time(flask.session['end_time'])
+    open = open[-14:-9]
+    close = close[-14:-9]
+    open_hr = int(open[:2])
+    open_min = int(open[-2:])
+    close_hr = int(close[:2])
+    close_min = int(close[-2:])
 
 
+    chosen_ids = []
+    for i in cal_list:
+        if i['summary'] in chosen:
+            chosen_ids.append(i['id'])
+
+
+    print(chosen_ids)
+
+
+    event_list = []
+
+    for day in day_range:
+        day_start = day.replace(hour=open_hr, minute = open_min)
+        day_end = day.replace(hour=close_hr, minute = close_min)
+        print(day_start, day_end)
+        for cur_id in chosen_ids:
+            today_events = gcal_service.events().list(
+                calendarId=cur_id,
+                orderBy="startTime",
+                timeMin=day_start,
+                timeMax=day_end).execute()
+            print(today_events)
+
+
+    #temp thing to test diplay on html side
     event_list = [2,5,8,9]
     result = {"event_list": event_list}
     return flask.jsonify(result=result)
