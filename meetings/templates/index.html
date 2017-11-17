@@ -98,12 +98,15 @@
     </tbody>
 </table>
 
+
 <script type="text/javascript">
 var SCRIPT_ROOT = {{request.script_root|tojson|safe}} ;
 var CHOOSE_URL = SCRIPT_ROOT + "/_choose";
 var EVENT_URL = SCRIPT_ROOT + "/_events";
 
+
 function populate_cal_table(){
+    // Get a list of the google calendars.
     $.getJSON(CHOOSE_URL, {}, function(data) {
         console.log("Populating table with calandars and checkboxes.");
         var cals = data.result.cal_list;
@@ -118,12 +121,13 @@ function populate_cal_table(){
     });
 }
 
+
 function populate_event_table(){
+    // Populate the event table with events from the selected calendars.
     var cal_tab = document.getElementById('cal_table');
     var leng = cal_tab.rows.length;
     chosen = [];
     for (var i = 0; i < leng; i++){
-//        var thisrow = cal_tab.rows[i];
         var chkname = "check" + i;
         var chk = document.getElementById(chkname);
         var cal_name = "calendar_number_" + i;
@@ -132,6 +136,7 @@ function populate_event_table(){
             chosen.push(thiscal)
         }
     }
+
     console.log("The following calendars have been selected: " + chosen);
     $.getJSON(EVENT_URL, {chosen: JSON.stringify(chosen)}, function(data){
         console.log("Populating event list.");
@@ -145,8 +150,9 @@ function populate_event_table(){
         var len = events.length;
         for (var i = 0; i < len; i++) {
             e_table.insertRow().outerHTML = "<tr>" + events[i] + "</tr>";
+            // Add some whitespace for legibility.
+            e_table.insertRow().outerHTML = "<tr><br /></tr>";
         }
-
     });
 }
 
@@ -158,34 +164,10 @@ $(document).on('change', 'input[type=checkbox]', function(e) {
 });
 
 
-  $(document).ready(function(){
-        console.log("Page loaded");
-        populate_cal_table();
-  });
-
-
-//    TRASH  TRASH  TRASH  TRASH  TRASH  TRASH  TRASH  TRASH
-//  TRASH  TRASH  TRASH  TRASH  TRASH  TRASH  TRASH  TRASH
-//TRASH  TRASH  TRASH  TRASH  TRASH  TRASH  TRASH  TRASH
-//
-//
-  //            console.log(cal_tab.rows.length);
-//            console.log(cal_tab.rows[i][0]);
-//
-//            create_listener();
-//
-//            checkbox = document.querySelector("input[name=checkbox]");
-//
-//            checkbox.addEventListener('change', function() {
-//                populate_event_table();
-//            });
-
-//            var cur_row = cal_tab.rows[i].childNodes;
-//            var chkbx = $(cur_row[0]).parents(".the_row").find("input[name='checkbox']");
-//            $('chkbx').click(function(){
-//                populate_event_table();
-//            });
-//            make_listener(chkbx, cals[i].summary);
+$(document).ready(function(){
+    console.log("Page loaded");
+    populate_cal_table();
+});
 
 </script>
 

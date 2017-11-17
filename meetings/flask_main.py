@@ -125,22 +125,17 @@ def events():
     close_hr = int(close[:2])
     close_min = int(close[-2:])
 
-
+    # Transfer from summary to cal id:
     chosen_ids = []
     for i in cal_list:
         if i['summary'] in chosen:
             chosen_ids.append(i['id'])
 
-
-    print(chosen_ids)
-
-
+    # Build the event list.
     event_list = []
-
     for day in day_range:
         day_start = day.replace(hour=open_hr, minute = open_min)
         day_end = day.replace(hour=close_hr, minute = close_min)
-        print(day_start, day_end)
         for cur_id in chosen_ids:
             today_events = gcal_service.events().list(
                 calendarId=cur_id,
@@ -148,11 +143,28 @@ def events():
                 timeMin=day_start,
                 timeMax=day_end,
                 singleEvents=True).execute()
-            print(today_events)
+            for event in today_events['items']:
+                try:
+                    e_start = str(event['originalStartTime']['dateTime'])
+                except KeyError:
+                    try:
+                        e_start = str(event['start']['dateTime'])
+                    except:
+                        continue
 
+                this_event = [str(event['summary']), e_start]
+                if this_event not in event_list:
+                    event_list.append(this_event)
 
-    #temp thing to test diplay on html side
-    event_list = [2,5,8,9]
+    # Sort the event list, add a humanized time
+    event_list.sort(key=lambda i: arrow.get(i[1]))
+    for i in range(len(event_list)):
+        event_list[i] = "{}, {}, {}".format(
+            event_list[i][0],
+            event_list[i][1],
+            arrow.get(event_list[i][1]).humanize())
+
+    # Return final list to js for displaying.
     result = {"event_list": event_list}
     return flask.jsonify(result=result)
 
