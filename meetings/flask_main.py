@@ -144,9 +144,10 @@ def events():
         for cur_id in chosen_ids:
             today_events = gcal_service.events().list(
                 calendarId=cur_id,
-                orderBy="startTime",
+                orderBy='startTime',
                 timeMin=day_start,
-                timeMax=day_end).execute()
+                timeMax=day_end,
+                singleEvents=True).execute()
             print(today_events)
 
 
