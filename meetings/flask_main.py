@@ -20,6 +20,9 @@ import httplib2   # used in oauth2 flow
 # Google API for services
 from apiclient import discovery
 
+# My function to go from a list of events to a list of free times:
+from free import free
+
 ###
 # Globals
 ###
@@ -106,7 +109,6 @@ def events():
         i['selected'] = True
     flask.g.calendars = cal_list
 
-    print("\n\n\n\n\n\n WE ARE IN PYTHON NOW \n\n\n")
     chosen = request.args.get("chosen")
     app.logger.debug("The following calendars have been chosen: {}".format(chosen))
 
@@ -134,8 +136,8 @@ def events():
     # Build the event list.
     event_list = []
     for day in day_range:
-        day_start = day.replace(hour=open_hr, minute = open_min)
-        day_end = day.replace(hour=close_hr, minute = close_min)
+        day_start = day.replace(hour=open_hr, minute=open_min)
+        day_end = day.replace(hour=close_hr, minute=close_min)
         for cur_id in chosen_ids:
             today_events = gcal_service.events().list(
                 calendarId=cur_id,
@@ -151,21 +153,38 @@ def events():
                         e_start = str(event['start']['dateTime'])
                     except:
                         continue
+                # try:
+                e_finish = str(event['end']['dateTime'])
 
-                this_event = [str(event['summary']), e_start]
+                this_event = [str(event['summary']), e_start, e_finish]
                 if this_event not in event_list:
                     event_list.append(this_event)
 
     # Sort the event list, add a humanized time
     event_list.sort(key=lambda i: arrow.get(i[1]))
+
+    # Now pass all the necessary args to the function to calculate freetime:
+    min_len = int(flask.session['meeting_length'])
+    free_windows = []
+    free_windows = free(event_list, open_hr, open_min, close_hr, close_min, day_range, min_len)
+    # Free windows is a list of pairs of arrow objects
+    # representing open and close time of a window of free time.
+
     for i in range(len(event_list)):
         event_list[i] = "{}, {}, {}".format(
             event_list[i][0],
             event_list[i][1],
             arrow.get(event_list[i][1]).humanize())
 
-    # Return final list to js for displaying.
-    result = {"event_list": event_list}
+    formatted_free_times = []
+    for window in free_windows:
+        win_str = "You are free from {} to {}.".format(
+            window[0].format('ddd, MMM D, h:mm a'),
+            window[1].format('h:mm a'))
+        formatted_free_times.append(win_str)
+
+    # Return final list and free time list to js for displaying.
+    result = {"event_list": event_list, "formatted_free_times": formatted_free_times}
     return flask.jsonify(result=result)
 
 
@@ -293,10 +312,12 @@ def setrange():
 
     op_time = request.form.get('open')
     close_time = request.form.get('close')
+    meeting_length = request.form.get('meeting_length')
 
     flask.session['daterange'] = daterange
     flask.session['begin_time'] = op_time
     flask.session['end_time'] = close_time
+    flask.session['meeting_length'] = meeting_length
     daterange_parts = daterange.split()
 
     app.logger.debug(op_time)
@@ -304,6 +325,7 @@ def setrange():
 
     flask.session['begin_date'] = interpret_date(daterange_parts[0])
     flask.session['end_date'] = interpret_date(daterange_parts[2])
+
     app.logger.debug("Setrange parsed {} - {}  dates as {} - {}".format(
         daterange_parts[0], daterange_parts[1],
         flask.session['begin_date'], flask.session['end_date']))
@@ -331,6 +353,7 @@ def init_session_values():
     # Default time span
     flask.session["begin_time"] = "9:00 AM"
     flask.session["end_time"] = "5:00 PM"
+    flask.session["meeting_length"] = "30"
 
 
 def interpret_time(text):

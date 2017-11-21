@@ -80,6 +80,14 @@
              {% else %}
                 value="5:00 PM"
              {% endif %}>
+            <br /><br />
+            <label> Minimum window length in which to schedule meetings (minutes): </label>
+      <input type="text" name="meeting_length" id="meeting_length" size="10"
+             {% if session.meeting_length is defined %}
+                value="{{session.meeting_length}}"
+             {% else %}
+                value="30"
+             {% endif %}>
 <br /><br /><input id="go" type="submit" value="Go!" />
 </form>
 
@@ -97,7 +105,14 @@
     <tbody>
     </tbody>
 </table>
-
+<br />
+    <h2>Blocks of free time: </h2>
+<!-- Table to be filled in by js functions -->
+<table class="free_table" id="free_table">
+    <tbody>
+    </tbody>
+</table>
+    <br /><br /><br />
 
 <script type="text/javascript">
 var SCRIPT_ROOT = {{request.script_root|tojson|safe}} ;
@@ -141,17 +156,35 @@ function populate_event_table(){
     $.getJSON(EVENT_URL, {chosen: JSON.stringify(chosen)}, function(data){
         console.log("Populating event list.");
         var events = data.result.event_list;
+        var free_times = data.result.formatted_free_times;
+
         var table = document.getElementById('event_table');
         while (table.firstChild) {
             table.removeChild(table.firstChild);
         }
         var e_table = document.createElement('tbody');
         table.appendChild(e_table);
+
         var len = events.length;
         for (var i = 0; i < len; i++) {
             e_table.insertRow().outerHTML = "<tr>" + events[i] + "</tr>";
             // Add some whitespace for legibility.
             e_table.insertRow().outerHTML = "<tr><br /></tr>";
+        }
+
+        // Now populate the table of free times
+        var table = document.getElementById('free_table');
+        while (table.firstChild) {
+            table.removeChild(table.firstChild);
+        }
+        var f_table = document.createElement('tbody');
+        table.appendChild(f_table);
+
+        var len = free_times.length;
+        for (var i = 0; i < len; i++) {
+            f_table.insertRow().outerHTML = "<tr>" + free_times[i] + "</tr>";
+            // Add some whitespace for legibility.
+            f_table.insertRow().outerHTML = "<tr><br /></tr>";
         }
     });
 }
