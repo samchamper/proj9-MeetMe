@@ -29,10 +29,10 @@ def free(e_list, op_hr, op_min, c_hr, c_min, day_range, min_len):
     # Step three: each window of time between merged events that is longer than
     # minimum length is a window of time in which a meeting can be scheduled, so
     # add them to a list, and return.
-    final_list = free_list(merged_list, day_range)
-    crop_list(final_list, min_len)
+    freetimes_list = free_list(merged_list, day_range)
+    crop = crop_list(freetimes_list, min_len)
 
-    return final_list
+    return crop
 
 
 def add_nights_to_busy(e_list, op_hr, op_min, c_hr, c_min, day_range):
@@ -153,6 +153,8 @@ def crop_list(timelist, min_len):
     """
     Crop out items shorter than min len
     """
+    croped_list = []
     for i in timelist:
-        if i[0].shift(minutes=+min_len) > i[1]:
-            timelist.remove(i)
+        if i[0].shift(minutes=+min_len) <= i[1]:
+            croped_list.append(i)
+    return croped_list
