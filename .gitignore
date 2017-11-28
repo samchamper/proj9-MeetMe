@@ -66,5 +66,8 @@ docs/_build/
 # PyBuilder
 target/
 
+# IDE stuff
+.idea/
+
 credentials.ini
 client_id.json
