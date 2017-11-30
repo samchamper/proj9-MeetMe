@@ -25,7 +25,6 @@ def free(e_list, op_hr, op_min, c_hr, c_min, day_range, min_len):
 
     # Step two: merge overlapping events on the event list into single events.
     merged_list = merge_events(local_event_list)
-
     # Step three: each window of time between merged events that is longer than
     # minimum length is a window of time in which a meeting can be scheduled, so
     # add them to a list, and return.
@@ -49,7 +48,7 @@ def add_nights_to_busy(e_list, op_hr, op_min, c_hr, c_min, day_range):
     """
     open_time = float(op_hr) + op_min / 60
     close_time = float(c_hr) + c_min / 60
-    td = 24- (close_time - open_time)
+    td = 24 - (close_time - open_time)
     prev_day = day_range[0].shift(days=-1)
     # Start by blocking out the time for the previous day, to cover the case
     # that the first closed period starts the previous day (example: people
@@ -70,9 +69,8 @@ def add_nights_to_busy(e_list, op_hr, op_min, c_hr, c_min, day_range):
 def merge_events(events):
     """
     :param events: a list of events
-    :return: a list of events with all
-    overlapping and immediately abutting
-    events merged into single events.
+    :return: a list of events with all overlapping and immediately
+                     abutting events merged into single events.
     """
     arrow_list = []
     for i in events:
@@ -82,7 +80,7 @@ def merge_events(events):
     block_start = arrow_list[0][0]
     block_end = arrow_list[0][1]
     index = 1
-    while index < len(arrow_list) - 1:
+    while index < len(arrow_list):
         while arrow_list[index][0] <= block_end:
             # Look through events until past the block of overlapping ones.
             block_end = max([block_end, arrow_list[index][1]])
@@ -109,7 +107,7 @@ def free_list(busy, day_range):
     The only cases that need to be considered are the first window of
     free time and the last window of free time, which may be cut by the
     absolute opening time of the time window under consideration or the
-    absolute close time
+    absolute close time.
     :param busy: a list of events (each consisting of two arrow objects).
     :param day_range: a list of days, arrow objects.
     :return: a list of free times (each consisting of two arrow objects

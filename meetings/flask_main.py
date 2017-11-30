@@ -1,17 +1,11 @@
 import flask
 from flask import render_template
 from flask import request
-from flask import url_for
-import uuid
-
-import json
 import logging
 
 # Date handling
 import arrow
-# import datetime  # ??
 from dateutil import tz  # For interpreting local times
-
 
 # OAuth2  - Google library implementation for convenience
 from oauth2client import client
@@ -102,9 +96,11 @@ def events():
     if not credentials:
         app.logger.debug("Redirecting to authorization")
         return flask.redirect(flask.url_for('oauth2callback'))
+
     gcal_service = get_gcal_service(credentials)
     app.logger.debug("Returned from get_gcal_service")
     cal_list = list_calendars(gcal_service)
+
     for i in cal_list:
         i['selected'] = True
     flask.g.calendars = cal_list
@@ -118,14 +114,15 @@ def events():
     day_range = arrow.Arrow.range('day', begin, end)
 
     # Manipulate open and close times to get hours and minutes.
-    open = interpret_time(flask.session['begin_time'])
-    close = interpret_time(flask.session['end_time'])
-    open = open[-14:-9]
-    close = close[-14:-9]
-    open_hr = int(open[:2])
-    open_min = int(open[-2:])
-    close_hr = int(close[:2])
-    close_min = int(close[-2:])
+    open_time = interpret_time(flask.session['begin_time'])
+    close_time = interpret_time(flask.session['end_time'])
+    tz = int(open_time[-6:-3])
+    open_time = open_time[-14:-9]
+    close_time = close_time[-14:-9]
+    open_hr = int(open_time[:2])
+    open_min = int(open_time[-2:])
+    close_hr = int(close_time[:2])
+    close_min = int(close_time[-2:])
 
     # Transfer from summary to cal id:
     chosen_ids = []
@@ -141,41 +138,52 @@ def events():
         for cur_id in chosen_ids:
             today_events = gcal_service.events().list(
                 calendarId=cur_id,
-                orderBy='startTime',
                 timeMin=day_start,
                 timeMax=day_end,
                 singleEvents=True).execute()
+
             for event in today_events['items']:
                 try:
+                    # For repeating events.
                     e_start = str(event['originalStartTime']['dateTime'])
                 except KeyError:
                     try:
+                        # For standard events.
                         e_start = str(event['start']['dateTime'])
-                    except:
-                        continue
-                # try:
-                e_finish = str(event['end']['dateTime'])
+                    except KeyError:
+                        try:
+                            # For all day events.
+                            e_start = arrow.get(event['start']['date']).replace(tzinfo='local').isoformat()
+                        except KeyError:
+                            continue
+                try:
+                    e_finish = str(event['end']['dateTime'])
+                except KeyError:
+                    # All day events
+                    e_finish = arrow.get(event['end']['date']).replace(tzinfo='local').isoformat()
 
                 this_event = [str(event['summary']), e_start, e_finish]
                 if this_event not in event_list:
                     event_list.append(this_event)
 
-    # Sort the event list, add a humanized time
-    event_list.sort(key=lambda i: arrow.get(i[1]))
+    # Sort the event list.
+    event_list.sort(key=lambda el: arrow.get(el[1]))
 
     # Now pass all the necessary args to the function to calculate freetime:
     min_len = int(flask.session['meeting_length'])
-    free_windows = []
+    # free_windows = []
     free_windows = free(event_list, open_hr, open_min, close_hr, close_min, day_range, min_len)
     # Free windows is a list of pairs of arrow objects
     # representing open and close time of a window of free time.
 
+    # Final formatting for the event list.
     for i in range(len(event_list)):
         event_list[i] = "{}, {}, {}".format(
             event_list[i][0],
             event_list[i][1],
             arrow.get(event_list[i][1]).humanize())
 
+    # Final formatting for list of free times.
     formatted_free_times = []
     for window in free_windows:
         win_str = "You are free from {} to {}.".format(
@@ -375,15 +383,7 @@ def interpret_time(text):
                     .format(text))
         raise
     return as_arrow.isoformat()
-    # HACK #Workaround
-    # isoformat() on raspberry Pi does not work for some dates
-    # far from now.  It will fail with an overflow from time stamp out
-    # of range while checking for daylight savings time.  Workaround is
-    # to force the date-time combination into the year 2016, which seems to
-    # get the timestamp into a reasonable range. This workaround should be
-    # removed when Arrow or Dateutil.tz is fixed.
-    # FIXME: Remove the workaround when arrow is fixed (but only after testing
-    # on raspberry Pi --- failure is likely due to 32-bit integers on that platform)
+    # HACK #Workaround for raspberry Pi because isoformat doesn't work on some dates.
 
 
 def interpret_date(text):
@@ -423,11 +423,7 @@ def list_calendars(service):
     result = []
     for cal in calendar_list:
         kind = cal["kind"]
-        id = cal["id"]
-        if "description" in cal:
-            desc = cal["description"]
-        else:
-            desc = "(no description)"
+        cal_id = cal["id"]
         summary = cal["summary"]
         # Optional binary attributes with False as default
         selected = ("selected" in cal) and cal["selected"]
@@ -435,7 +431,7 @@ def list_calendars(service):
 
         result.append(
            {"kind": kind,
-            "id": id,
+            "id": cal_id,
             "summary": summary,
             "selected": selected,
             "primary": primary})

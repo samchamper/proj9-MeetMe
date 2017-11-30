@@ -5,7 +5,6 @@ import nose
 from free import free
 import arrow
 
-# 9 0 17 0
 day_range = [arrow.get("2017-11-21T00:00:00-08:00"),
              arrow.get("2017-11-22T00:00:00-08:00"),
              arrow.get("2017-11-23T00:00:00-08:00"),
@@ -24,12 +23,11 @@ def output_format(times_list):
         formatted_free_times.append(fmt_str)
     return formatted_free_times
 
+
 # free(e_list, op_hr, op_min, c_hr, c_min, day_range, min_len):
-
-
 def test_free_one():
     events = [['Event', '2017-11-21T10:00:00-08:00', '2017-11-21T11:20:00-08:00']]
-    freetimes = free(events, 9, 0, 17, 0, day_range, 30)
+    freetimes = free(events, 9, 0, 17, 0, day_range, 30)  #from 9 to 5.
     fmt_freetime= output_format(freetimes)
     for i in fmt_freetime:
         print(i)
@@ -39,7 +37,8 @@ def test_free_one():
                             'Thu, Nov 23, 9:00 am to Thu, Nov 23, 5:00 pm.',
                             'Fri, Nov 24, 9:00 am to Fri, Nov 24, 5:00 pm.',
                             'Sat, Nov 25, 9:00 am to Sat, Nov 25, 5:00 pm.',
-                            'Sun, Nov 26, 9:00 am to Sun, Nov 26, 5:00 pm.']
+                            'Sun, Nov 26, 9:00 am to Sun, Nov 26, 5:00 pm.',
+                            'Mon, Nov 27, 9:00 am to Mon, Nov 27, 5:00 pm.']
 
 
 def test_nothing_fits():
@@ -63,7 +62,8 @@ def test_overlap():
                             'Thu, Nov 23, 9:00 am to Thu, Nov 23, 5:00 pm.',
                             'Fri, Nov 24, 9:00 am to Fri, Nov 24, 5:00 pm.',
                             'Sat, Nov 25, 9:00 am to Sat, Nov 25, 5:00 pm.',
-                            'Sun, Nov 26, 9:00 am to Sun, Nov 26, 5:00 pm.']
+                            'Sun, Nov 26, 9:00 am to Sun, Nov 26, 5:00 pm.',
+                            'Mon, Nov 27, 9:00 am to Mon, Nov 27, 5:00 pm.']
 
 
 def test_shotgun():
@@ -96,4 +96,5 @@ def test_shotgun():
                             'Sun, Nov 26, 1:30 pm to Sun, Nov 26, 5:00 pm.',
                             'Mon, Nov 27, 9:00 am to Mon, Nov 27, 5:00 pm.',
                             'Tue, Nov 28, 9:00 am to Tue, Nov 28, 10:00 am.',
-                            'Tue, Nov 28, 11:20 am to Tue, Nov 28, 12:00 pm.']
+                            'Tue, Nov 28, 11:20 am to Tue, Nov 28, 12:00 pm.',
+                            'Tue, Nov 28, 1:00 pm to Tue, Nov 28, 2:00 pm.']

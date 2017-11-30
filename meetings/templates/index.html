@@ -88,7 +88,7 @@
              {% else %}
                 value="30"
              {% endif %}>
-<br /><br /><input id="go" type="submit" value="Go!" />
+<br /><br /><input id="go" type="submit" value="Set date range!" />
 </form>
 
 
@@ -122,15 +122,17 @@ var EVENT_URL = SCRIPT_ROOT + "/_events";
 
 function populate_cal_table(){
     // Get a list of the google calendars.
-    $.getJSON(CHOOSE_URL, {}, function(data) {
+    $.getJSON(CHOOSE_URL, {}, function(data){
         console.log("Populating table with calandars and checkboxes.");
         var cals = data.result.cal_list;
 
         var cal_tab = document.getElementById('cal_table');
         var num_cals = cals.length;
         for (var i = 0; i < num_cals; i++) {
-            cal_tab.insertRow().outerHTML = "<tr class='the_row'> <input name='checkbox' type='checkbox' id='check" + i + "'> " + cals[i].summary +
-                "<input name='value' id='calendar_number_" + i + "' value ='" + cals[i].summary + "' readonly style='visibility:hidden'> </tr>";
+            cal_tab.insertRow().outerHTML = "<tr class='the_row'> <input name='checkbox' type='checkbox' id='check" + i
+                + "'> " + cals[i].summary +
+                "<input name='value' id='calendar_number_" + i + "' value ='" + cals[i].summary +
+                "' readonly style='visibility:hidden'> </tr>";
         }
         populate_event_table();
     });
@@ -151,7 +153,6 @@ function populate_event_table(){
             chosen.push(thiscal)
         }
     }
-
     console.log("The following calendars have been selected: " + chosen);
     $.getJSON(EVENT_URL, {chosen: JSON.stringify(chosen)}, function(data){
         console.log("Populating event list.");
