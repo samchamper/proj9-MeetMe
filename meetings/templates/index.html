@@ -6,7 +6,6 @@
 <link rel="stylesheet" type="text/css"
      href="//cdn.jsdelivr.net/bootstrap/latest/css/bootstrap.css"/>
 
-
 <link rel="stylesheet" type="text/css"
     href="/static/css/busy.css"/>
 
@@ -42,7 +41,7 @@
 {% endwith %}
 
   <label> Date range:  </label>
-  <form action="/setrange" method="post">
+  <form id ="datetime_form" action="/setrange" method="post">
   <input type="text" name="daterange" size="12"
     {% if session.daterange is defined %}
          value="{{session.daterange}}"
@@ -67,14 +66,14 @@
     });
   </script>
       <br /><br />
-      <label> Time range (HH:MM AM/PM or 24hour HH:MM): </label>
-      <input type="text" name="open" id="open" size="10"
+      <label> Time range </label>
+      <input type=time name="open" id="open" size="10"
              {% if session.begin_time is defined %}
                 value="{{session.begin_time}}"
              {% else %}
                 value="9:00 AM"
              {% endif %}>
-      <input type="text" name="close" id="close" size="10"
+      <input type=time name="close" id="close" size="10"
              {% if session.end_time is defined %}
                 value="{{session.end_time}}"
              {% else %}
@@ -88,9 +87,8 @@
              {% else %}
                 value="30"
              {% endif %}>
-<br /><br /><input id="go" type="submit" value="Set date range!" />
+<br /><br /><input id="go" type="submit" value="Go!" />
 </form>
-
 
 
     <h2>Calendars: </h2>
@@ -201,6 +199,34 @@ $(document).on('change', 'input[type=checkbox]', function(e) {
 $(document).ready(function(){
     console.log("Page loaded");
     populate_cal_table();
+
+    $('input[name="open"]').change(
+        function() {
+            // Reload the times when this element is changed.
+            // Includes a delay so that we have time to change both the hours
+            // and the minutes before the page just starts automatically reloading.
+            setTimeout(function(){document.getElementById('datetime_form').submit();}, 6000);
+        });
+
+    $('input[name="close"]').change(
+        function() {
+            // Reload the times when this element is changed.
+            // Includes a delay so that we have time to change both the hours
+            // and the minutes before the page just starts automatically reloading.
+            setTimeout(function(){document.getElementById('datetime_form').submit();}, 6000);
+        });
+
+    $('input[name="meeting_length"]').change(
+        function() {
+            // Reload the times when this element is changed.
+            document.getElementById('datetime_form').submit();
+        });
+
+    $('input[name="daterange"]').change(
+        function() {
+            // Reload the times when this element is changed.
+            document.getElementById('datetime_form').submit();
+        });
 });
 
 </script>

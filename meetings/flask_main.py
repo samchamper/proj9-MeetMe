@@ -116,7 +116,6 @@ def events():
     # Manipulate open and close times to get hours and minutes.
     open_time = interpret_time(flask.session['begin_time'])
     close_time = interpret_time(flask.session['end_time'])
-    tz = int(open_time[-6:-3])
     open_time = open_time[-14:-9]
     close_time = close_time[-14:-9]
     open_hr = int(open_time[:2])
