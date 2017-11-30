@@ -1,0 +1,85 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<html> <head>
+<title>MeetMe!</title>
+  <!-- 'viewport' is used by bootstrap to respond to device size -->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Javascript:  JQuery from a content distribution network (CDN) -->
+  <script
+     src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js">
+  </script>
+
+  <!-- Bootstrap includes javascript and css  (must follow jquery) -->
+  <link rel="stylesheet"
+   href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
+   <script
+    src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js">
+</script>
+
+   <!-- Our own style sheet -->
+   <link rel="stylesheet" href="/static/css/memos.css" />
+
+</head>
+<body>
+<div class="container">
+<!-- Flashed messages before content -->
+{% with messages = get_flashed_messages() %}
+  {% if messages %}
+    <ul class=flashes>
+    {% for message in messages %}
+      <li>{{ message }}</li>
+    {% endfor %}
+    </ul>
+  {% endif %}
+{% endwith %}
+
+<br /><br />
+<label>Welcome to MeetMe!, the web app that helps you find common free times for your group to meet.</label>
+<br /><br /><br />
+    <label for="code">I already have a meeting code:</label>
+    <br />
+    <input type="text" name="code" id="code" placeholder="Meeting code">
+    <input type="submit" name="codebutton" id="codebutton" value="Enter meeting code" onclick="submit_code()">
+    <output name="notes" id="notes" type="text" value=""></output>
+<form action ='/new_meeting'>
+    <label for="code">I'm planning a new meeting:</label>
+    <br />
+    <input type="submit" value="Generate meeting code">
+</form>
+
+    <br /><br /><br />
+
+<script type="text/javascript">
+
+  var SCRIPT_ROOT = {{ request.script_root|tojson|safe }};
+  var CHECK_URL = SCRIPT_ROOT + "/_check";
+  var JOIN_URL = SCRIPT_ROOT + "/join";
+
+  function submit_code() {
+    // A function to submit the entered meeting code.
+    console.log("Checking meeting code against database.");
+    var meet_code = document.getElementById('code').value;
+    var error_field = document.getElementById('notes');
+    console.log(code);
+    $.getJSON(CHECK_URL, {meet_code: meet_code}, function(data) {
+         console.log(data);
+         var err = data.result.error;
+         if (err){
+             error_field.value = "Can't find a meeting with that meeting code! Try again or create a new meeting!";
+         }
+         else{
+            window.location.assign(SCRIPT_ROOT + meet_code + "/join");
+         }
+    });
+  }
+
+
+  $(document).ready(function(){onPageLoad();});
+
+  function onPageLoad(){
+  }
+
+</script>
+</div>
+</body>
+</html>

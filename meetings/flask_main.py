@@ -2,6 +2,7 @@ import flask
 from flask import render_template
 from flask import request
 import logging
+import sys
 
 # Date handling
 import arrow
@@ -13,6 +14,13 @@ import httplib2   # used in oauth2 flow
 
 # Google API for services
 from apiclient import discovery
+
+# Mongo database
+from pymongo import MongoClient
+
+# For creating random event codes
+import random
+from string import ascii_letters as letters
 
 # My function to go from a list of events to a list of free times:
 from free import free
@@ -36,20 +44,114 @@ CLIENT_SECRET_FILE = CONFIG.GOOGLE_KEY_FILE
 APPLICATION_NAME = 'MeetMe class project'
 
 
+# Connect to mongo for database of meetings.
+MONGO_CLIENT_URL = "mongodb://{}:{}@{}:{}/{}".format(
+    CONFIG.DB_USER,
+    CONFIG.DB_USER_PW,
+    CONFIG.DB_HOST,
+    CONFIG.DB_PORT,
+    CONFIG.DB)
+
+app.logger.debug("Using Mongo URL: '{}'".format(MONGO_CLIENT_URL))
+try:
+    dbclient = MongoClient(MONGO_CLIENT_URL)
+    db = getattr(dbclient, str(CONFIG.DB))
+    collection = db.meetings
+except:
+    app.logger.debug("Failure opening database. Is Mongo running? Correct password?")
+    sys.exit(1)
+
+
 #############################
 #  Pages (routed from URLs)
 #############################
 @app.route("/")
+@app.route("/start")
 @app.route("/index")
 def index():
-    app.logger.debug("Entering index")
+    app.logger.debug("Entering start page")
     if 'begin_date' not in flask.session:
         init_session_values()
-    return render_template('index.html')
+    return render_template('start.html')
 
 
-@app.route("/choose")
-def choose():
+@app.route("/_check")
+def check():
+    app.logger.debug("Checking meeting code")
+    meet_code = request.args.get("meet_code")
+
+    records = []
+    for record in collection.find({"type": "meeting"}):
+        records.append(record['code'])
+
+    if meet_code in records:
+        result = {"meet_code": meet_code}
+        return flask.jsonify(result=result)
+
+    result = {"error": "1"}
+    return flask.jsonify(result=result)
+
+
+@app.route("/new_meeting")
+def new_meeting():
+    # Get a new meeting code.
+    # The meeting codes are random strings of 12 ascii letters.
+    # It seems pretty unlikely that the same two codes will ever be generated,
+    # but this function double checks just in case.
+    records = []
+    for record in collection.find({"type": "meeting"}):
+        records.append(record['code'])
+
+    done = False
+    while done is False:
+        meetcode = ''.join(random.choice(letters) for _ in range(10))
+        if meetcode not in records:
+            done = True
+
+    app.logger.debug("Adding new meeting to database with meet code: {}"
+                     .format(meetcode))
+
+    new = {"type": "meeting",
+           "busy": [],
+           "daterange": [],
+           "participants": [],
+           "already_checked_in": [],
+           "code": meetcode}
+    collection.insert(new)
+    flask.session['meetcode'] = meetcode
+    return render_template('new_meeting.html')
+
+
+@app.route("/_get_names")
+def get_names():
+    """
+    Get the list of names from the new meeting table,
+    then reroute to the join meeting page.
+    """
+    people = request.args.get("participants")
+    app.logger.debug("Got this list of participants: {}".format(people))
+
+    # Turn the list of participants back into a list.
+    people = people[2:-2].split("\",\"")
+    # Might as well alphabetize it?
+    people.sort()
+
+    # Add the people going to the event to the database.
+    meetcode = flask.session['meetcode']
+    collection.find_one_and_update({"meetcode": meetcode},
+                                   { '$set': {"participants": people}})
+
+    # Now that we have the list of people,
+    # send the meetcode over to js so we can get redirected.
+    result = {"meetcode": meetcode }
+    return flask.jsonify(result=result)
+
+
+@app.route("/<meetcode>/join")
+def join(meetcode):
+    flask.session['meetcode'] = meetcode
+    if 'begin_date' not in flask.session:
+        init_session_values()
     # Need authorization to list calendars
     app.logger.debug("Checking credentials for Google calendar access")
     credentials = valid_credentials()
@@ -140,7 +242,6 @@ def events():
                 timeMin=day_start,
                 timeMax=day_end,
                 singleEvents=True).execute()
-
             for event in today_events['items']:
                 try:
                     # For repeating events.
@@ -296,7 +397,7 @@ def oauth2callback():
         # but for the moment I'll just log it and go back to
         # the main screen
         app.logger.debug("Got credentials")
-        return flask.redirect(flask.url_for('choose'))
+        return flask.redirect(flask.url_for('join',meetcode=flask.session['meetcode']))
 
 
 #####
@@ -337,7 +438,7 @@ def setrange():
         daterange_parts[0], daterange_parts[1],
         flask.session['begin_date'], flask.session['end_date']))
 
-    return flask.redirect(flask.url_for("choose"))
+    return flask.redirect(flask.url_for('join',meetcode=flask.session['meetcode']))
 
 
 ####

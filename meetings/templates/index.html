@@ -1,6 +1,6 @@
 <!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
 <html lang="en"> <head>
-<title>Appointments</title>
+<title>MeetMe!</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <link rel="stylesheet" type="text/css"
@@ -24,21 +24,21 @@
 <body>
 <div class="container">
 
-<h1>Busy times</h1>
+<h1>Let's figure out when you're free!</h1>
 <br />
 <!--
   -- If there are any warnings or other messages from a prior action,
   -- they appear above the rest of the content, until the next action.
   -->
-{% with messages = get_flashed_messages() %}
-  {% if messages %}
-    <ul class=flashes>
-    {% for message in messages %}
-      <li>{{ message }}</li>
-    {% endfor %}
-    </ul>
-  {% endif %}
-{% endwith %}
+{#{% with messages = get_flashed_messages() %}#}
+{#  {% if messages %}#}
+{#    <ul class=flashes>#}
+{#    {% for message in messages %}#}
+{#      <li>{{ message }}</li>#}
+{#    {% endfor %}#}
+{#    </ul>#}
+{#  {% endif %}#}
+{#{% endwith %}#}
 
   <label> Date range:  </label>
   <form id ="datetime_form" action="/setrange" method="post">
@@ -80,7 +80,7 @@
                 value="5:00 PM"
              {% endif %}>
             <br /><br />
-            <label> Minimum window length in which to schedule meetings (minutes): </label>
+            <label> Minimum window of time in which to schedule meetings (minutes): </label>
       <input type="text" name="meeting_length" id="meeting_length" size="10"
              {% if session.meeting_length is defined %}
                 value="{{session.meeting_length}}"
@@ -104,7 +104,7 @@
     </tbody>
 </table>
 <br />
-    <h2>Blocks of free time: </h2>
+    <h2>Your blocks of free time: </h2>
 <!-- Table to be filled in by js functions -->
 <table class="free_table" id="free_table">
     <tbody>
@@ -121,7 +121,7 @@ var EVENT_URL = SCRIPT_ROOT + "/_events";
 function populate_cal_table(){
     // Get a list of the google calendars.
     $.getJSON(CHOOSE_URL, {}, function(data){
-        console.log("Populating table with calandars and checkboxes.");
+        console.log("Populating table with calendars and checkboxes.");
         var cals = data.result.cal_list;
 
         var cal_tab = document.getElementById('cal_table');

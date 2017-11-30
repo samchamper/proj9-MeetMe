@@ -1,6 +1,7 @@
 arrow
 Flask
 nose
+pymongo
 google-api-python-client
 httplib2==0.10.3
 oauth2client==2.2.0
