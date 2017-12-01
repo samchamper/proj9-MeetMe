@@ -113,9 +113,11 @@ def new_meeting():
 
     new = {"type": "meeting",
            "busy": [],
-           "daterange": [],
+           "daterange": "None",
            "participants": [],
            "already_checked_in": [],
+           "duration": 0,
+           "description": "None",
            "code": meetcode}
     collection.insert(new)
     flask.session['meetcode'] = meetcode
@@ -125,25 +127,37 @@ def new_meeting():
 @app.route("/_get_names")
 def get_names():
     """
-    Get the list of names from the new meeting table,
-    then reroute to the join meeting page.
+    Get the list of names, description, and duration from
+    the new meeting table, then reroute to the join meeting page.
     """
     people = request.args.get("participants")
     app.logger.debug("Got this list of participants: {}".format(people))
+
+    desc = str(request.args.get("desc"))
+    duration = int(request.args.get("duration"))
+    date_rng = request.args.get("daterange")
+    app.logger.debug("Event description: {}".format(desc))
+    app.logger.debug("Event duration: {}".format(duration))
+    app.logger.debug("Date range: {}".format(date_rng))
 
     # Turn the list of participants back into a list.
     people = people[2:-2].split("\",\"")
     # Might as well alphabetize it?
     people.sort()
-
     # Add the people going to the event to the database.
     meetcode = flask.session['meetcode']
-    collection.find_one_and_update({"meetcode": meetcode},
-                                   { '$set': {"participants": people}})
 
-    # Now that we have the list of people,
+    collection.find_one_and_update(
+        {"code": meetcode},
+        {'$set': {"participants": people,
+                  "description": desc,
+                  "duration": duration,
+                  "daterange": date_rng}})
+
+
+    # Now that we have the meeting in the db,
     # send the meetcode over to js so we can get redirected.
-    result = {"meetcode": meetcode }
+    result = {"meetcode": meetcode}
     return flask.jsonify(result=result)
 
 
@@ -168,6 +182,29 @@ def join(meetcode):
 
     flask.g.calendars = cal_list
     return render_template('index.html')
+
+
+@app.route("/_populate")
+def populate():
+    """
+    Populate the join page with info from the database.
+    """
+    meetcode = flask.session['meetcode']
+
+    # Get the record with this meet code.
+    record = dict()
+    for i in collection.find({"code": meetcode}):
+        # Only one record will ever match each meetcode.
+        record = i
+
+    duration = record['duration']
+    description = record['description']
+    participants = record['participants']
+
+    result = {"description": description,
+              "duration":duration,
+              "participants":participants}
+    return flask.jsonify(result=result)
 
 
 @app.route("/_choose")
@@ -207,6 +244,15 @@ def events():
         i['selected'] = True
     flask.g.calendars = cal_list
 
+    meetcode = flask.session['meetcode']
+    # Get the record with this meet code.
+    record = dict()
+    for i in collection.find({"code": meetcode}):
+        # Only one record will ever match each meetcode.
+        record = i
+    duration = record['duration']
+    # TODO BEGIN DATE AND END DATE FROM DB.
+
     chosen = request.args.get("chosen")
     app.logger.debug("The following calendars have been chosen: {}".format(chosen))
 
@@ -216,8 +262,8 @@ def events():
     day_range = arrow.Arrow.range('day', begin, end)
 
     # Manipulate open and close times to get hours and minutes.
-    open_time = interpret_time(flask.session['begin_time'])
-    close_time = interpret_time(flask.session['end_time'])
+    open_time = interpret_time(request.args.get("open"))
+    close_time = interpret_time(request.args.get("close"))
     open_time = open_time[-14:-9]
     close_time = close_time[-14:-9]
     open_hr = int(open_time[:2])
@@ -270,31 +316,53 @@ def events():
     event_list.sort(key=lambda el: arrow.get(el[1]))
 
     # Now pass all the necessary args to the function to calculate freetime:
-    min_len = int(flask.session['meeting_length'])
+    min_len = int(duration)
     # free_windows = []
-    free_windows = free(event_list, open_hr, open_min, close_hr, close_min, day_range, min_len)
+    free_windows, db_ready_busy = free(event_list, open_hr, open_min, close_hr, close_min, day_range, min_len)
     # Free windows is a list of pairs of arrow objects
     # representing open and close time of a window of free time.
 
-    # Final formatting for the event list.
+    # Display formatting for the event list.
     for i in range(len(event_list)):
-        event_list[i] = "{}, {}, {}".format(
-            event_list[i][0],
-            event_list[i][1],
-            arrow.get(event_list[i][1]).humanize())
+        event_list[i] = ["Event name: {}".format(event_list[i][0]),
+                         "Start time: {}".format(arrow.get(event_list[i][1]).format('ddd, MMM D, h:mm a')),
+                         "End time: {}".format(arrow.get(event_list[i][2]).format('ddd, MMM D, h:mm a'))]
 
-    # Final formatting for list of free times.
+    # Display formatting for list of free times.
     formatted_free_times = []
     for window in free_windows:
-        win_str = "You are free from {} to {}.".format(
+        win_str = "From {} to {}.".format(
             window[0].format('ddd, MMM D, h:mm a'),
             window[1].format('h:mm a'))
         formatted_free_times.append(win_str)
 
     # Return final list and free time list to js for displaying.
-    result = {"event_list": event_list, "formatted_free_times": formatted_free_times}
+    result = {"event_list": event_list, "formatted_free_times": formatted_free_times, "db_ready_busy": db_ready_busy}
     return flask.jsonify(result=result)
 
+
+@app.route("/_send")
+def send():
+    """
+    Function to update the database with the person who is
+    responding, and their busy times.
+    """
+    invitee = request.args.get('invitee')
+    busy_times = request.args.get('busy_times')
+    print(invitee, busy_times)
+    # TODO: convert busy_times to a list.
+    # TODO: add the events in the list to the db.
+    # TODO: swap invitee from invited to already answered.
+
+    meetcode = flask.session['meetcode']
+    # Get the record with this meet code.
+    record = dict()
+    for i in collection.find({"code": meetcode}):
+        # Only one record will ever match each meetcode.
+        record = i
+
+    result = {"error": "1"}
+    return flask.jsonify(result=result)
 
 ####
 #  Google calendar authorization:
@@ -411,21 +479,21 @@ def oauth2callback():
 @app.route('/setrange', methods=['POST'])
 def setrange():
     """
+    NO LONGER USED
     User chose a date range with the bootstrap daterange
     widget.
     """
+    # TODO : DELETE
     app.logger.debug("Entering setrange")
     flask.flash("Setrange gave us '{}'".format(request.form.get('daterange')))
     daterange = request.form.get('daterange')
 
     op_time = request.form.get('open')
     close_time = request.form.get('close')
-    meeting_length = request.form.get('meeting_length')
 
     flask.session['daterange'] = daterange
     flask.session['begin_time'] = op_time
     flask.session['end_time'] = close_time
-    flask.session['meeting_length'] = meeting_length
     daterange_parts = daterange.split()
 
     app.logger.debug(op_time)
@@ -459,9 +527,8 @@ def init_session_values():
         tomorrow.format("MM/DD/YYYY"),
         nextweek.format("MM/DD/YYYY"))
     # Default time span
-    flask.session["begin_time"] = "9:00 AM"
-    flask.session["end_time"] = "5:00 PM"
-    flask.session["meeting_length"] = "30"
+    flask.session["begin_time"] = "09:00"
+    flask.session["end_time"] = "17:00"
 
 
 def interpret_time(text):

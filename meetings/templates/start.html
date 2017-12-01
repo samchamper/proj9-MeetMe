@@ -22,16 +22,6 @@
 </head>
 <body>
 <div class="container">
-<!-- Flashed messages before content -->
-{% with messages = get_flashed_messages() %}
-  {% if messages %}
-    <ul class=flashes>
-    {% for message in messages %}
-      <li>{{ message }}</li>
-    {% endfor %}
-    </ul>
-  {% endif %}
-{% endwith %}
 
 <br /><br />
 <label>Welcome to MeetMe!, the web app that helps you find common free times for your group to meet.</label>
@@ -41,7 +31,8 @@
     <input type="text" name="code" id="code" placeholder="Meeting code">
     <input type="submit" name="codebutton" id="codebutton" value="Enter meeting code" onclick="submit_code()">
     <output name="notes" id="notes" type="text" value=""></output>
-<form action ='/new_meeting'>
+<br /><br />
+    <form action ='/new_meeting'>
     <label for="code">I'm planning a new meeting:</label>
     <br />
     <input type="submit" value="Generate meeting code">

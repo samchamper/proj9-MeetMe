@@ -28,6 +28,8 @@
 
     <h1>Create a new meeting</h1>
     <br />
+    <textarea name='description' id="description" rows='3' cols='30' placeholder="Meeting description..."></textarea>
+    <br /><br />
     <label>List everyone that will be attending, including you:</label>
 
     <table class="invite_table" id="invite_table">
@@ -36,6 +38,33 @@
       <td><input type="submit" value="Add" onclick="add_invitee()"></td>
     </tr>
   </table>
+  <br /><br />
+
+  <label><b>Date range:</b></label>
+  <input type="text" name="daterange" id="daterange" size="15"
+     class="pull-down"
+     style="background: #fff; cursor: pointer; padding: 5px 10px;
+     border: 1px solid #ccc; width: 15em" >
+  <script type="text/javascript">
+  $(function() {
+  $('input[name="daterange"]').daterangepicker(
+    {    ranges: {
+           'Today': [moment(), moment()],
+           'Tomorrow':[moment().add(1, 'days'),
+                       moment().add(1, 'days')],
+           'This week':[moment(), moment().endOf('week')],
+           'Next week':[moment().add(7, 'days').startOf('week'),
+                        moment().add(7, 'days').endOf('week')],
+           'This month':[moment(), moment().endOf('month')],
+           'Within two weeks':[moment(),moment().add(15, 'days')]
+        }}
+       );
+    });
+  </script>
+
+    <br /><br />
+    <label> Minimum window of time in which to schedule (minutes): </label>
+    <input type="text" name="meeting_length" id="meeting_length" size="10" value="30">
 
     <br />
     <input type="submit" value="Create meeting!" onclick="goto_join_page()">
@@ -62,10 +91,13 @@
 
 
   function goto_join_page(){
-    // Get all the names, pass them over to the server,
+    // Get all the names and other stuff, pass them over to the server,
     // then redirect to the join page for the meeting that we just created.
     console.log("Preparing to redirect to join page for the new meeting.");
     var table = document.getElementById('invite_table');
+    var desc = document.getElementById('description').value;
+    var duration = document.getElementById('meeting_length').value;
+    var daterange = document.getElementById('daterange').value;
     var participants = [];
     var tab_len = table.rows.length;
     for (var i = 0; i < tab_len; i++){
@@ -75,9 +107,10 @@
         }
     }
     console.log("Got the following participants: ", participants);
-    if (participants.length >= 1){
+    if (participants.length >= 1 && !isNaN(duration) && duration > 0){
         // Don't want to do actually go to the next page if list is empty.
-        $.getJSON(NEXT_URL, {participants: JSON.stringify(participants)}, function(data){
+        $.getJSON(NEXT_URL, {participants: JSON.stringify(participants),
+                        desc: desc, duration: duration, daterange: daterange}, function(data){
              var meet_code = data.result.meetcode;
              console.log("Routing to meet code:", meet_code);
              window.location.assign(SCRIPT_ROOT + meet_code + "/join");

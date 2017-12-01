@@ -24,71 +24,23 @@
 <body>
 <div class="container">
 
-<h1>Let's figure out when you're free!</h1>
+<h1>Join the meeting!</h1>
 <br />
-<!--
-  -- If there are any warnings or other messages from a prior action,
-  -- they appear above the rest of the content, until the next action.
-  -->
-{#{% with messages = get_flashed_messages() %}#}
-{#  {% if messages %}#}
-{#    <ul class=flashes>#}
-{#    {% for message in messages %}#}
-{#      <li>{{ message }}</li>#}
-{#    {% endfor %}#}
-{#    </ul>#}
-{#  {% endif %}#}
-{#{% endwith %}#}
 
-  <label> Date range:  </label>
-  <form id ="datetime_form" action="/setrange" method="post">
-  <input type="text" name="daterange" size="12"
-    {% if session.daterange is defined %}
-         value="{{session.daterange}}"
-    {% endif %}
-     class="pull-down"
-     style="background: #fff; cursor: pointer; padding: 5px 10px;
-     border: 1px solid #ccc; width: 12em" >
-  <script type="text/javascript">
-  $(function() {
-  $('input[name="daterange"]').daterangepicker(
-    {    ranges: {
-           'Today': [moment(), moment()],
-           'Tomorrow':[moment().add(1, 'days'),
-                       moment().add(1, 'days')],
-           'This week':[moment(), moment().endOf('week')],
-           'Next week':[moment().add(7, 'days').startOf('week'),
-                        moment().add(7, 'days').endOf('week')],
-           'This month':[moment(), moment().endOf('month')],
-           'Within two weeks':[moment(),moment().add(15, 'days')]
-        }}
-       );
-    });
-  </script>
+
+<label><b>Meeting details:</b></label>
+<br />
+<p id="description"></p>
+<label><b>Anticipated duration:</b></label>
+<label id="duration"></label>
+
+<br />
+
+<h2>Now, for your availability!</h2>
+      <label><b>Time range</b></label>
+      <input type=time name="open" id="open" size="10" value="09:00">
+      <input type=time name="close" id="close" size="10" value="17:00">
       <br /><br />
-      <label> Time range </label>
-      <input type=time name="open" id="open" size="10"
-             {% if session.begin_time is defined %}
-                value="{{session.begin_time}}"
-             {% else %}
-                value="9:00 AM"
-             {% endif %}>
-      <input type=time name="close" id="close" size="10"
-             {% if session.end_time is defined %}
-                value="{{session.end_time}}"
-             {% else %}
-                value="5:00 PM"
-             {% endif %}>
-            <br /><br />
-            <label> Minimum window of time in which to schedule meetings (minutes): </label>
-      <input type="text" name="meeting_length" id="meeting_length" size="10"
-             {% if session.meeting_length is defined %}
-                value="{{session.meeting_length}}"
-             {% else %}
-                value="30"
-             {% endif %}>
-<br /><br /><input id="go" type="submit" value="Go!" />
-</form>
 
 
     <h2>Calendars: </h2>
@@ -110,12 +62,59 @@
     <tbody>
     </tbody>
 </table>
-    <br /><br /><br />
+    <br /><br />
+<label><h2>Which meeting participant are you?</h2></label>
+<table class="people_table" id="people_table"></table>
+<br />
+<input id="join" type="submit" value="Submit!" onclick="send_stuff_to_db()" />
+<br /><br /><br />
 
 <script type="text/javascript">
 var SCRIPT_ROOT = {{request.script_root|tojson|safe}} ;
 var CHOOSE_URL = SCRIPT_ROOT + "/_choose";
 var EVENT_URL = SCRIPT_ROOT + "/_events";
+var POP_URL = SCRIPT_ROOT + "/_populate";
+var SEND_URL = SCRIPT_ROOT + "/_send";
+
+// A global for busy times. Globals will be set in
+// the populate event table function and then sent
+// to the database in the send stuff to db function.
+var busy_times;
+
+function send_stuff_to_db(){
+    // Sends selected invitee, daterange,
+    // and busy_times to python to send to the db.
+    console.log("Updating database...");
+    var invitee = document.querySelector('input[name="person"]:checked').value;
+    console.log(invitee);
+    console.log(busy_times);
+    $.getJSON(SEND_URL, {invitee: invitee,
+                         busy_times: JSON.stringify(busy_times)},
+                         function(data){
+        console.log("About to redirect to meeting status page.");
+    });
+}
+
+function stuff_from_database(){
+    // Put stuff from the database on the page,
+    // like the event description, the people pending,
+    // and the meeting length.
+    $.getJSON(POP_URL, {}, function(data){
+        console.log("Got info from database.");
+        var descript = data.result.description;
+        var duration = data.result.duration;
+        var participants = data.result.participants;
+        document.getElementById("description").innerHTML = descript;
+        document.getElementById("duration").innerHTML = duration + " minutes.";
+
+        var people_table = document.getElementById('people_table');
+
+        for (var i = 0; i < participants.length; i++){
+            people_table.insertRow().outerHTML = "<tr> <input type='radio' name='person' value='" +
+                    participants[i] + "' id=p_'" + participants[i] + "> " + participants[i] +"<br/></tr>"
+        }
+    });
+}
 
 
 function populate_cal_table(){
@@ -151,11 +150,15 @@ function populate_event_table(){
             chosen.push(thiscal)
         }
     }
+    var open = document.getElementById('open').value;
+    var close = document.getElementById('close').value;
+
     console.log("The following calendars have been selected: " + chosen);
-    $.getJSON(EVENT_URL, {chosen: JSON.stringify(chosen)}, function(data){
+    $.getJSON(EVENT_URL, {open: open, close: close, chosen: JSON.stringify(chosen)}, function(data){
         console.log("Populating event list.");
         var events = data.result.event_list;
         var free_times = data.result.formatted_free_times;
+        busy_times = data.result.db_ready_busy;
 
         var table = document.getElementById('event_table');
         while (table.firstChild) {
@@ -166,7 +169,8 @@ function populate_event_table(){
 
         var len = events.length;
         for (var i = 0; i < len; i++) {
-            e_table.insertRow().outerHTML = "<tr>" + events[i] + "</tr>";
+            e_table.insertRow().outerHTML = "<tr>" + events[i][0] + "<br />" +
+                events[i][1] + "<br />" + events[i][2] + "</tr>";
             // Add some whitespace for legibility.
             e_table.insertRow().outerHTML = "<tr><br /></tr>";
         }
@@ -198,6 +202,7 @@ $(document).on('change', 'input[type=checkbox]', function(e) {
 
 $(document).ready(function(){
     console.log("Page loaded");
+    stuff_from_database();
     populate_cal_table();
 
     $('input[name="open"]').change(
@@ -205,7 +210,7 @@ $(document).ready(function(){
             // Reload the times when this element is changed.
             // Includes a delay so that we have time to change both the hours
             // and the minutes before the page just starts automatically reloading.
-            setTimeout(function(){document.getElementById('datetime_form').submit();}, 6000);
+            setTimeout(function(){populate_event_table();}, 6000);
         });
 
     $('input[name="close"]').change(
@@ -213,20 +218,9 @@ $(document).ready(function(){
             // Reload the times when this element is changed.
             // Includes a delay so that we have time to change both the hours
             // and the minutes before the page just starts automatically reloading.
-            setTimeout(function(){document.getElementById('datetime_form').submit();}, 6000);
+            setTimeout(function(){populate_event_table();}, 6000);
         });
 
-    $('input[name="meeting_length"]').change(
-        function() {
-            // Reload the times when this element is changed.
-            document.getElementById('datetime_form').submit();
-        });
-
-    $('input[name="daterange"]').change(
-        function() {
-            // Reload the times when this element is changed.
-            document.getElementById('datetime_form').submit();
-        });
 });
 
 </script>

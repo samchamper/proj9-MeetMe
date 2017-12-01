@@ -29,9 +29,12 @@ def free(e_list, op_hr, op_min, c_hr, c_min, day_range, min_len):
     # minimum length is a window of time in which a meeting can be scheduled, so
     # add them to a list, and return.
     freetimes_list = free_list(merged_list, day_range)
-    crop = crop_list(freetimes_list, min_len)
+    crop_free = crop_list(freetimes_list, min_len)
 
-    return crop
+    # Also want to return a list of unlabeled busy times to upload to the database:
+    db_ready_busy = prep_for_db(merged_list)
+
+    return crop_free, db_ready_busy
 
 
 def add_nights_to_busy(e_list, op_hr, op_min, c_hr, c_min, day_range):
@@ -156,3 +159,12 @@ def crop_list(timelist, min_len):
         if i[0].shift(minutes=+min_len) <= i[1]:
             croped_list.append(i)
     return croped_list
+
+
+def prep_for_db(merged_list):
+    db_list = []
+    for i in range(len(merged_list)):
+        db_list.append([merged_list[i][0].isoformat(), merged_list[i][1].isoformat()])
+    return db_list
+
+#         db_str += merged_list[i][0].isoformat() + "||" + merged_list[i][1].isoformat() + "|-|"
