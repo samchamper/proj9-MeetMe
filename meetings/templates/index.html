@@ -34,7 +34,7 @@
 <label><b>Anticipated duration:</b></label>
 <label id="duration"></label>
 
-<br />
+<br /><br />
 
 <h2>Now, for your availability!</h2>
       <label><b>Time range</b></label>
@@ -75,6 +75,7 @@ var CHOOSE_URL = SCRIPT_ROOT + "/_choose";
 var EVENT_URL = SCRIPT_ROOT + "/_events";
 var POP_URL = SCRIPT_ROOT + "/_populate";
 var SEND_URL = SCRIPT_ROOT + "/_send";
+var REDIR_URL = SCRIPT_ROOT + "/_redir";
 
 // A global for busy times. Globals will be set in
 // the populate event table function and then sent
@@ -86,12 +87,23 @@ function send_stuff_to_db(){
     // and busy_times to python to send to the db.
     console.log("Updating database...");
     var invitee = document.querySelector('input[name="person"]:checked').value;
-    console.log(invitee);
-    console.log(busy_times);
+
     $.getJSON(SEND_URL, {invitee: invitee,
                          busy_times: JSON.stringify(busy_times)},
                          function(data){
-        console.log("About to redirect to meeting status page.");
+             var meeting_code = data.result.meetcode;
+             console.log("Routing to status page for ", meeting_code);
+             window.location.assign(SCRIPT_ROOT + meeting_code + "/status");
+    });
+}
+
+function redir(){
+    // Redirect to meeting status page.
+    console.log("Redirecting...");
+    $.getJSON(REDIR_URL, {}, function(data){
+             var meet_code = data.result.meetcode;
+             console.log("Routing to status page for ", meet_code);
+             window.location.assign(SCRIPT_ROOT + meet_code + "/status");
     });
 }
 
@@ -104,6 +116,13 @@ function stuff_from_database(){
         var descript = data.result.description;
         var duration = data.result.duration;
         var participants = data.result.participants;
+
+        if(participants.length == 0){
+            // If there are no participants left to sign in,
+            // just redirect to the status page.
+            redir()
+        }
+
         document.getElementById("description").innerHTML = descript;
         document.getElementById("duration").innerHTML = duration + " minutes.";
 

@@ -1,0 +1,79 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<html lang="en"> <head>
+<title>MeetMe!</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<link rel="stylesheet" type="text/css"
+     href="//cdn.jsdelivr.net/bootstrap/latest/css/bootstrap.css"/>
+
+<link rel="stylesheet" type="text/css"
+    href="/static/css/busy.css"/>
+
+<!-- jquery from a content distribution network; probably cached -->
+<script type="text/javascript"
+     src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js">
+</script>
+</head>
+
+<body>
+<div class="container">
+
+<h1>Meeting status</h1>
+<br />
+
+<label><b>Meeting details:</b></label>
+<br />
+<p id="description"></p>
+<label><b>Anticipated duration:</b></label>
+<label id="duration"></label>
+
+<br />
+
+<h2>Currently available blocks of free time:</h2>
+<table class="free_table" id="free_table">
+</table>
+
+<br /><br /><br />
+
+<script type="text/javascript">
+var SCRIPT_ROOT = {{request.script_root|tojson|safe}} ;
+var GET_EVENT_URL = SCRIPT_ROOT + "/_pull_info";
+
+function get_stuff_from_database(){
+    // Put stuff from the database on the page,
+    // like the event description, the people pending,
+    // and the meeting length.
+    $.getJSON(GET_EVENT_URL, {}, function(data){
+        console.log("Got info from database.");
+        var descript = data.result.description;
+        var duration = data.result.duration;
+        var participants = data.result.participants;
+
+        if(participants.length == 0){
+            // If there are no participants left to sign in,
+            // just redirect to the status page.
+            redir()
+        }
+
+        document.getElementById("description").innerHTML = descript;
+        document.getElementById("duration").innerHTML = duration + " minutes.";
+
+        var people_table = document.getElementById('people_table');
+
+        for (var i = 0; i < participants.length; i++){
+            people_table.insertRow().outerHTML = "<tr> <input type='radio' name='person' value='" +
+                    participants[i] + "' id=p_'" + participants[i] + "> " + participants[i] +"<br/></tr>"
+        }
+    });
+}
+
+$(document).ready(function(){
+    console.log("Page loaded");
+    get_stuff_from_database()
+});
+
+</script>
+
+</div>  <!--for bootstrap-->
+</body>
+</html>

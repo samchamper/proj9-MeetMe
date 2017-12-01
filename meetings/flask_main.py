@@ -154,7 +154,6 @@ def get_names():
                   "duration": duration,
                   "daterange": date_rng}})
 
-
     # Now that we have the meeting in the db,
     # send the meetcode over to js so we can get redirected.
     result = {"meetcode": meetcode}
@@ -193,17 +192,18 @@ def populate():
 
     # Get the record with this meet code.
     record = dict()
-    for i in collection.find({"code": meetcode}):
+    # for i in collection.find({"code": meetcode}):
         # Only one record will ever match each meetcode.
-        record = i
+        # record = i
+    record = collection.find({"code": meetcode})[0]
 
     duration = record['duration']
     description = record['description']
     participants = record['participants']
 
     result = {"description": description,
-              "duration":duration,
-              "participants":participants}
+              "duration": duration,
+              "participants": participants}
     return flask.jsonify(result=result)
 
 
@@ -251,14 +251,16 @@ def events():
         # Only one record will ever match each meetcode.
         record = i
     duration = record['duration']
-    # TODO BEGIN DATE AND END DATE FROM DB.
+    daterange_parts = record['daterange'].split()
+    begin_date = interpret_date(daterange_parts[0])
+    end_date = interpret_date(daterange_parts[2])
 
     chosen = request.args.get("chosen")
     app.logger.debug("The following calendars have been chosen: {}".format(chosen))
 
     # Get the range of days we are interested in
-    begin = arrow.get(flask.session['begin_date'])
-    end = arrow.get(flask.session['end_date'])
+    begin = arrow.get(begin_date)
+    end = arrow.get(end_date)
     day_range = arrow.Arrow.range('day', begin, end)
 
     # Manipulate open and close times to get hours and minutes.
@@ -345,14 +347,10 @@ def events():
 def send():
     """
     Function to update the database with the person who is
-    responding, and their busy times.
+    responding and their busy times.
     """
     invitee = request.args.get('invitee')
     busy_times = request.args.get('busy_times')
-    print(invitee, busy_times)
-    # TODO: convert busy_times to a list.
-    # TODO: add the events in the list to the db.
-    # TODO: swap invitee from invited to already answered.
 
     meetcode = flask.session['meetcode']
     # Get the record with this meet code.
@@ -361,8 +359,89 @@ def send():
         # Only one record will ever match each meetcode.
         record = i
 
-    result = {"error": "1"}
+    # First indicate the person who just responded.
+    if "{}".format(invitee) in record['participants']:
+        # The invitee should always be in the record unless
+        # users are doing something wrong, like multiple people
+        # choosing the same name at the same time. This if covers
+        # that case.
+        record['participants'].remove("{}".format(invitee))
+        record['already_checked_in'].append("{}".format(invitee))
+
+    # Next append the new list of busy times to the list from the db.
+    # First the new list will need to be converted from a str to a list.
+    busy_times = busy_times[3:-3].split("\"],[\"")
+    for i in range(len(busy_times)):
+        record['busy'].append(busy_times[i].split("\",\""))
+
+    # Now update the database with the new busy times,
+    # and updated info on who has checked in.
+    collection.find_one_and_update(
+        {"code": meetcode},
+        {'$set': {"participants": record['participants'],
+                  "already_checked_in": record['already_checked_in'],
+                  "busy": record['busy']}})
+
+    result = {"meetcode": meetcode}
     return flask.jsonify(result=result)
+
+
+@app.route("/_redir")
+def redir():
+    """
+    Redirect to meeting status page.
+    """
+    meetcode = flask.session['meetcode']
+    result = {"meetcode": meetcode}
+    return flask.jsonify(result=result)
+
+
+@app.route("/<meetcode>/<meetcode2>/status")
+def status_redir(meetcode,meetcode2):
+    """
+    Function to correct super weird buggy behaviour
+    of window.location.assign in js.
+    I have no idea why the following js:
+    window.location.assign(SCRIPT_ROOT + meeting_code + "/status");
+    is routing me to "/<meetcode>/<meetcode2>/status".
+    meetcode is in js properly, as determined by console logging.
+    For now, this trashy redirect function fixes the problem.
+    """
+    app.logger.debug("Entering meeting status page")
+    return flask.redirect(flask.url_for('status', meetcode=meetcode))
+
+
+@app.route("/<meetcode>/status")
+def status(meetcode):
+    """
+    The status page for each meeting.
+    """
+    app.logger.debug("Entering meeting status page")
+    print(meetcode)
+    return render_template('status.html')
+
+@app.route("/_pull_info")
+def pull_info():
+    """
+    Grabs all of the meeting details from the database,
+    calculates free windows based on all busy times in
+    the database, and sends it all over to user.
+    """
+    meetcode = flask.session['meetcode']
+    # Get the record with this meet code.
+    record = dict()
+    for i in collection.find({"code": meetcode}):
+        # Only one record will ever match each meetcode.
+        record = i
+
+    #        "busy": [],
+
+    result = {"description": record['description'],
+              "participants": record['participants'],
+              "already_checked_in": record['already_checked_in'],
+              "duration": record['duration']}
+    return flask.jsonify(result=result)
+
 
 ####
 #  Google calendar authorization:
@@ -465,7 +544,7 @@ def oauth2callback():
         # but for the moment I'll just log it and go back to
         # the main screen
         app.logger.debug("Got credentials")
-        return flask.redirect(flask.url_for('join',meetcode=flask.session['meetcode']))
+        return flask.redirect(flask.url_for('join', meetcode=flask.session['meetcode']))
 
 
 #####
@@ -506,7 +585,7 @@ def setrange():
         daterange_parts[0], daterange_parts[1],
         flask.session['begin_date'], flask.session['end_date']))
 
-    return flask.redirect(flask.url_for('join',meetcode=flask.session['meetcode']))
+    return flask.redirect(flask.url_for('join', meetcode=flask.session['meetcode']))
 
 
 ####
@@ -517,6 +596,7 @@ def init_session_values():
     Start with some reasonable defaults for date and time ranges.
     Note this must be run in app context ... can't call from main.
     """
+    # TODO: DELETE THIS FUNCTION
     # Default date span = tomorrow to 1 week from now
     now = arrow.now('local')     # We really should be using tz from browser
     tomorrow = now.replace(days=+1)
