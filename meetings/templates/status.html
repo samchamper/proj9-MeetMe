@@ -86,7 +86,7 @@ function get_stuff_from_database(){
             pending_table.insertRow().outerHTML = "<tr><p><b>The following participants' " +
                 "responses are still pending:</b></p></tr>"
         }else{
-            pending_table.insertRow().outerHTML = "<tr><p>It looks like all the invitee's have responded!</p></tr>"
+            pending_table.insertRow().outerHTML = "<tr><p>It looks like all the invitees have responded!</p></tr>"
         }
         for (var i = 0; i < pending.length; i++){
             pending_table.insertRow().outerHTML = "<tr><ul><li>" + pending[i] + "</ul></li></tr>"
