@@ -37,6 +37,27 @@ def free(e_list, op_hr, op_min, c_hr, c_min, day_range, min_len):
     return crop_free, db_ready_busy
 
 
+def db_free(e_list, day_range, duration):
+    local_event_list = e_list[:]  # A local copy to mess with.
+
+    # Step one: merge overlapping events.
+    # The merge function expects events of the form:
+    # [name, open_time, end_time], but these events have the form:
+    # [open_time, end_time]. So add a dummy item [0] to each event.
+    for i in local_event_list:
+        i.insert(0, "0")
+    # Merge function relies on list being sorted by start time.
+    local_event_list.sort(key=lambda i: arrow.get(i[1]))
+    merged_list = merge_events(local_event_list)
+
+    # Step two: each window of time between merged events that is longer than
+    # minimum length is a window of time in which a meeting can be scheduled, so
+    # add them to a list, and return.
+    freetimes_list = free_list(merged_list, day_range)
+    crop_free = crop_list(freetimes_list, duration)
+    return crop_free
+
+
 def add_nights_to_busy(e_list, op_hr, op_min, c_hr, c_min, day_range):
     """
     Add times that are beyond our specified time range to the busy list
@@ -166,5 +187,3 @@ def prep_for_db(merged_list):
     for i in range(len(merged_list)):
         db_list.append([merged_list[i][0].isoformat(), merged_list[i][1].isoformat()])
     return db_list
-
-#         db_str += merged_list[i][0].isoformat() + "||" + merged_list[i][1].isoformat() + "|-|"

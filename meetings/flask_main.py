@@ -3,6 +3,7 @@ from flask import render_template
 from flask import request
 import logging
 import sys
+import urllib
 
 # Date handling
 import arrow
@@ -23,7 +24,7 @@ import random
 from string import ascii_letters as letters
 
 # My function to go from a list of events to a list of free times:
-from free import free
+from free import free, db_free
 
 ###
 # Globals
@@ -191,10 +192,7 @@ def populate():
     meetcode = flask.session['meetcode']
 
     # Get the record with this meet code.
-    record = dict()
-    # for i in collection.find({"code": meetcode}):
-        # Only one record will ever match each meetcode.
-        # record = i
+    # Only one record will ever match each meetcode.
     record = collection.find({"code": meetcode})[0]
 
     duration = record['duration']
@@ -246,10 +244,8 @@ def events():
 
     meetcode = flask.session['meetcode']
     # Get the record with this meet code.
-    record = dict()
-    for i in collection.find({"code": meetcode}):
-        # Only one record will ever match each meetcode.
-        record = i
+    record = collection.find({"code": meetcode})[0]
+
     duration = record['duration']
     daterange_parts = record['daterange'].split()
     begin_date = interpret_date(daterange_parts[0])
@@ -354,10 +350,7 @@ def send():
 
     meetcode = flask.session['meetcode']
     # Get the record with this meet code.
-    record = dict()
-    for i in collection.find({"code": meetcode}):
-        # Only one record will ever match each meetcode.
-        record = i
+    record = collection.find({"code": meetcode})[0]
 
     # First indicate the person who just responded.
     if "{}".format(invitee) in record['participants']:
@@ -417,7 +410,6 @@ def status(meetcode):
     The status page for each meeting.
     """
     app.logger.debug("Entering meeting status page")
-    print(meetcode)
     return render_template('status.html')
 
 @app.route("/_pull_info")
@@ -429,17 +421,50 @@ def pull_info():
     """
     meetcode = flask.session['meetcode']
     # Get the record with this meet code.
-    record = dict()
-    for i in collection.find({"code": meetcode}):
-        # Only one record will ever match each meetcode.
-        record = i
+    record = collection.find({"code": meetcode})[0]
 
-    #        "busy": [],
+    # Get the range of days from the db
+    daterange_parts = record['daterange'].split()
+    begin_date = interpret_date(daterange_parts[0])
+    end_date = interpret_date(daterange_parts[2])
+    begin = arrow.get(begin_date)
+    end = arrow.get(end_date)
+    day_range = arrow.Arrow.range('day', begin, end)
+
+    # Calc free times based on everyone's busy times:
+    free = db_free(record["busy"], day_range, int(record["duration"]))
+
+    # Format the free times
+    formatted_free_times = []
+    for free_time in free:
+        free_str = "From {} to {}.".format(
+            free_time[0].format('ddd, MMM D, h:mm a'),
+            free_time[1].format('h:mm a'))
+        formatted_free_times.append(free_str)
+
+    # Generate a string to place into html as a mailto link.
+    # Wow is this ugly. Python is really not a word processor I guess:
+    mail_str = "<a href='mailto:recipient?subject=Join%20the%20meeting!&amp;body="
+    mail_str += urllib.parse.quote(record['description'])
+    mail_str += "%0A%0ATo%20join%20the%20meeting%20go%20to" \
+                "%3A%0Awherever_MeetMe_is_hosted%2F" + meetcode + "%2Fjoin"
+    mail_str += "%0ATo%20check%20the%20status%20of%20the%20meeting%2C%20go%20to" \
+                "%3A%0Awherever_MeetMe_is_hosted%2F" + meetcode + "%2Fstatus"
+    mail_str += urllib.parse.quote("\n\nIf MeetMe isn't hosted, you'll have to go hardcore and install it!\n To do so, " \
+                "open a command prompt or terminal in the folder you want to install it, then you'll need to have" \
+                " git installed and then to run:\ngit clone https://github.com/samchamper/proj9-MeetMe.git\n\n" \
+                "Then you'll need to place a credentials file and Google calendar access token " \
+                "in proj9-MeetMe/meetings \nThen from the proj9-MeetMe directory run:\nmake run\n" \
+                "Now you use MeetMe by navigating to http://localhost:8000/")
+    mail_str += "'>Send an invitation to the meeting!</a>"
 
     result = {"description": record['description'],
               "participants": record['participants'],
               "already_checked_in": record['already_checked_in'],
-              "duration": record['duration']}
+              "duration": record['duration'],
+              "free": formatted_free_times,
+              "mail_str": mail_str,
+              "meetcode": meetcode}
     return flask.jsonify(result=result)
 
 

@@ -17,7 +17,7 @@
 
 <body>
 <div class="container">
-
+<br />
 <h1>Meeting status</h1>
 <br />
 
@@ -29,7 +29,21 @@
 
 <br />
 
-<h2>Currently available blocks of free time:</h2>
+<p><b>The following participants have responded:</b></p>
+<table class="responded_table" id="responded_table">
+</table>
+<table class="pending_table" id="pending_table">
+</table>
+
+<br />
+<a id="mail_link">Send an invitation to the meeting!</a>
+<p id="code_area" ></p>
+<p id="join_link" ></p>
+<p id="status_link"></p>
+<br />
+<p>To keep track of this meeting, you can bookmark this page! Or send yourself an email with the link!</p>
+<br />
+<h2>These mutual blocks of free time are available:</h2>
 <table class="free_table" id="free_table">
 </table>
 
@@ -47,22 +61,39 @@ function get_stuff_from_database(){
         console.log("Got info from database.");
         var descript = data.result.description;
         var duration = data.result.duration;
-        var participants = data.result.participants;
+        var pending = data.result.participants;
+        var checked_in = data.result.already_checked_in;
+        var free = data.result.free;
+        var mail_str = data.result.mail_str;
+        var meeting_code = data.result.meetcode;
 
-        if(participants.length == 0){
-            // If there are no participants left to sign in,
-            // just redirect to the status page.
-            redir()
-        }
-
-        document.getElementById("description").innerHTML = descript;
+        // Update the html with the info from the db.
+        document.getElementById("description").innerHTML = "<ul><li>" + descript + "</ul></li>";
         document.getElementById("duration").innerHTML = duration + " minutes.";
+        document.getElementById("mail_link").innerHTML = mail_str;
+        document.getElementById("code_area").innerHTML = "Your meeting code is: " + meeting_code;
+        document.getElementById("join_link").innerHTML = "To join this meeting, go to: <br />" +
+            "wherever_this_is_hosted/" + meeting_code + "/join";
+        document.getElementById("status_link").innerHTML = "To check the status of this meeting, go to: <br />" +
+            "wherever_this_is_hosted/" + meeting_code + "/status";
 
-        var people_table = document.getElementById('people_table');
-
-        for (var i = 0; i < participants.length; i++){
-            people_table.insertRow().outerHTML = "<tr> <input type='radio' name='person' value='" +
-                    participants[i] + "' id=p_'" + participants[i] + "> " + participants[i] +"<br/></tr>"
+        var responded_table = document.getElementById('responded_table');
+        for (var i = 0; i < checked_in.length; i++){
+            responded_table.insertRow().outerHTML = "<tr><ul><li>" + checked_in[i] + "</ul></li></tr>"
+        }
+        var pending_table = document.getElementById('pending_table');
+        if (pending.length != 0){
+            pending_table.insertRow().outerHTML = "<tr><p><b>The following participants' " +
+                "responses are still pending:</b></p></tr>"
+        }else{
+            pending_table.insertRow().outerHTML = "<tr><p>It looks like all the invitee's have responded!</p></tr>"
+        }
+        for (var i = 0; i < pending.length; i++){
+            pending_table.insertRow().outerHTML = "<tr><ul><li>" + pending[i] + "</ul></li></tr>"
+        }
+        var free_table = document.getElementById('free_table');
+        for (var i = 0; i < free.length; i++){
+            free_table.insertRow().outerHTML = "<tr><ul><li>" + free[i] + "</ul></li></tr>"
         }
     });
 }
