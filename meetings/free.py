@@ -1,4 +1,4 @@
-# Implementation of function to find blocks of free time given a
+# Functions to find blocks of free time given a
 # list of events and some other parameters.
 # Author: Sam Champer
 
@@ -7,47 +7,64 @@ import arrow
 
 def free(e_list, op_hr, op_min, c_hr, c_min, day_range, min_len):
     """
-    Return a list of free times
-    :param e_list: a list of events that block free times.
+    Return a list of free times as well as a list of busy times stripped
+    of all personal info, ready to upload to a database.
+    :param e_list: A list of events that block free times.
     :param op_hr: The earliest time of day that counts as free.
-    :param op_min: min for op_hr
+    :param op_min: Minute for op_hr
     :param c_hr: The time of day after which we do not count as free.
-    :param c_min: min for c_hr.
+    :param c_min: Minute for c_hr.
     :param day_range: The range of days to find free time in.
     :param min_len: The minimum length of time a window of free time has to be in order to qualify for listing.
-    :return: list of windows of free time (each window is a list with two elements: window_open and window_close).
+    :return: crop_free: A list of windows of free time
+                    (each window is a list with two elements: window_open and window_close).
+             db_ready_busy: a list of busy times free of all personal info.
     """
     local_event_list = e_list[:]  # A local copy to mess with.
+
     # Step one: we can't meet outside the selected time windows,
     # so block those windows of time out, then add them to our busy times.
     add_nights_to_busy(local_event_list, op_hr, op_min, c_hr, c_min, day_range)
+
+    # Merge function relies on event list being sorted.
     local_event_list.sort(key=lambda i: arrow.get(i[1]))
 
     # Step two: merge overlapping events on the event list into single events.
     merged_list = merge_events(local_event_list)
+
     # Step three: each window of time between merged events that is longer than
     # minimum length is a window of time in which a meeting can be scheduled, so
     # add them to a list, and return.
     freetimes_list = free_list(merged_list, day_range)
     crop_free = crop_list(freetimes_list, min_len)
 
-    # Also want to return a list of unlabeled busy times to upload to the database:
+    # Make the list of unlabeled busy times to upload to the database.
     db_ready_busy = prep_for_db(merged_list)
 
     return crop_free, db_ready_busy
 
 
 def db_free(e_list, day_range, duration):
+    """
+    Different route into doing mostly the same thing: getting a list of free times.
+    This function takes the list of events from the database.
+    :param e_list: a list where elements are lists with a start and end time.
+    :param day_range: Range of time in which to look for free times.
+    :param duration: Minimum length of time in which to schedule meetings.
+    :return: A list of free times.
+    """
     local_event_list = e_list[:]  # A local copy to mess with.
 
     # Step one: merge overlapping events.
     # The merge function expects events of the form:
     # [name, open_time, end_time], but these events have the form:
-    # [open_time, end_time]. So add a dummy item [0] to each event.
+    # [open_time, end_time]. So add a dummy item[0] to each event.
     for i in local_event_list:
         i.insert(0, "0")
+
+    # Step two: merge events.
     # Merge function relies on list being sorted by start time.
-    local_event_list.sort(key=lambda i: arrow.get(i[1]))
+    local_event_list.sort(key=lambda el: arrow.get(el[1]))
     merged_list = merge_events(local_event_list)
 
     # Step two: each window of time between merged events that is longer than
@@ -72,11 +89,15 @@ def add_nights_to_busy(e_list, op_hr, op_min, c_hr, c_min, day_range):
     """
     open_time = float(op_hr) + op_min / 60
     close_time = float(c_hr) + c_min / 60
+
+    # The length of the daily out of bounds time.
     td = 24 - (close_time - open_time)
-    prev_day = day_range[0].shift(days=-1)
+
     # Start by blocking out the time for the previous day, to cover the case
     # that the first closed period starts the previous day (example: people
     # not available at night).
+    prev_day = day_range[0].shift(days=-1)
+
     # The blocked out time opens when the available time closes!
     block_time_op = prev_day.shift(hours=+close_time)
     # The blocked time goes for td hours.
@@ -84,6 +105,7 @@ def add_nights_to_busy(e_list, op_hr, op_min, c_hr, c_min, day_range):
     block = ["Not available", block_time_op.isoformat(), block_time_close.isoformat()]
     e_list.append(block)
     for i in day_range:
+        # Add the out of bounds time for every other day in the day range.
         block_time_op = i.shift(hours=+close_time)
         block_time_close = block_time_op.shift(hours=+td)
         block = ["Not available", block_time_op.isoformat(), block_time_close.isoformat()]
@@ -96,11 +118,13 @@ def merge_events(events):
     :return: a list of events with all overlapping and immediately
                      abutting events merged into single events.
     """
+    # First convert event list into a form where we can make comparisons.
     arrow_list = []
     for i in events:
         arrow_list.append([arrow.get(i[1]), arrow.get(i[2])])
 
     new_list = []
+    # Provisional start and end time for the first event block.
     block_start = arrow_list[0][0]
     block_end = arrow_list[0][1]
     index = 1
@@ -120,7 +144,6 @@ def merge_events(events):
         index += 1
     # Done going through the list. Append the final item.
     new_list.append([block_start, block_end])
-
     return new_list
 
 
@@ -134,10 +157,9 @@ def free_list(busy, day_range):
     absolute close time.
     :param busy: a list of events (each consisting of two arrow objects).
     :param day_range: a list of days, arrow objects.
-    :return: a list of free times (each consisting of two arrow objects
+    :return: a list of free times (each consisting of two arrow objects).
     """
     list_of_free_times = []
-
     index = 0
     # Special case for first window of free time.
     if busy[0][0] < day_range[0] < busy[0][1]:
@@ -147,13 +169,16 @@ def free_list(busy, day_range):
         index += 1
     elif day_range[0] > busy[0][0] and day_range[0] > busy[0][1]:
         # In this case, the first busy period is entirely before
-        # the time window, so it's garbage. Index past it.
+        # the time window, so it's garbage. Index past it. The first
+        # period of free time starts at midnight of the first day.
         free_open = day_range[0]
         index += 1
     else:
-        # Available window starts at midnight, don't index past event.
+        # Available window starts at midnight, don't index past event,
+        # since it starts after midnight.
         free_open = day_range[0]
 
+    # Index through the busy list, append gaps between events.
     while index < len(busy):
         free_close = busy[index][0]  # Event starts, free window closes.
         list_of_free_times.append([free_open, free_close])
@@ -163,11 +188,11 @@ def free_list(busy, day_range):
     # Final cleanup: if the last free_open is before midnight on the
     # last day, then midnight on the last day is free_close. If free_open
     # is after midnight on the last day, then it is trash
-    # so we need do nothing.
+    # so we need do nothing - the last window of free time correctly ended
+    # when the last event started.
     if free_open < day_range[-1]:
         free_close = day_range[-1]
         list_of_free_times.append([free_open, free_close])
-
     return list_of_free_times
 
 
@@ -177,13 +202,19 @@ def crop_list(timelist, min_len):
     """
     croped_list = []
     for i in timelist:
+        # Don't keep items if start time shifted forward
+        # by min length, is greater than end time.
         if i[0].shift(minutes=+min_len) <= i[1]:
             croped_list.append(i)
     return croped_list
 
 
 def prep_for_db(merged_list):
+    """
+    Cleans an event list for entry into the database.
+    """
     db_list = []
+    # Convert open time and close time to string.
     for i in range(len(merged_list)):
         db_list.append([merged_list[i][0].isoformat(), merged_list[i][1].isoformat()])
     return db_list

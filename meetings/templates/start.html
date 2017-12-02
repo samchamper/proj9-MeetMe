@@ -22,7 +22,8 @@
 </head>
 <body>
 <div class="container">
-
+<br /><br />
+<h1>MeetMe!</h1>
 <br /><br />
 <label>Welcome to MeetMe!, the web app that helps you find common free times for your group to meet.</label>
 <br /><br /><br />
@@ -32,7 +33,8 @@
     <input type="submit" name="codebutton" id="codebutton" value="Enter meeting code" onclick="submit_code()">
     <output name="notes" id="notes" type="text" value=""></output>
 <br /><br />
-    <form action ='/new_meeting'>
+   <!-- Button that goes to the new meeting page. -->
+<form action ='/new_meeting'>
     <label for="code">I'm planning a new meeting:</label>
     <br />
     <input type="submit" value="Generate meeting code">
@@ -44,16 +46,14 @@
 
   var SCRIPT_ROOT = {{ request.script_root|tojson|safe }};
   var CHECK_URL = SCRIPT_ROOT + "/_check";
-  var JOIN_URL = SCRIPT_ROOT + "/join";
 
   function submit_code() {
     // A function to submit the entered meeting code.
     console.log("Checking meeting code against database.");
     var meet_code = document.getElementById('code').value;
     var error_field = document.getElementById('notes');
-    console.log(code);
+    console.log("Got meet code from user:", code);
     $.getJSON(CHECK_URL, {meet_code: meet_code}, function(data) {
-         console.log(data);
          var err = data.result.error;
          if (err){
              error_field.value = "Can't find a meeting with that meeting code! Try again or create a new meeting!";
@@ -62,12 +62,6 @@
             window.location.assign(SCRIPT_ROOT + meet_code + "/join");
          }
     });
-  }
-
-
-  $(document).ready(function(){onPageLoad();});
-
-  function onPageLoad(){
   }
 
 </script>

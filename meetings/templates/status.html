@@ -54,9 +54,9 @@ var SCRIPT_ROOT = {{request.script_root|tojson|safe}} ;
 var GET_EVENT_URL = SCRIPT_ROOT + "/_pull_info";
 
 function get_stuff_from_database(){
-    // Put stuff from the database on the page,
-    // like the event description, the people pending,
-    // and the meeting length.
+    // Put stuff from the database on the page: available
+    // times, the event description, the people pending,
+    // the people responded, and the meeting length.
     $.getJSON(GET_EVENT_URL, {}, function(data){
         console.log("Got info from database.");
         var descript = data.result.description;
@@ -104,7 +104,6 @@ $(document).ready(function(){
 });
 
 </script>
-
 </div>  <!--for bootstrap-->
 </body>
 </html>

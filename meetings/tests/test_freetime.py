@@ -1,6 +1,6 @@
-"""
-Nose tests for most of the functions in the memo application.
-"""
+# Nose tests for free.
+# Author Sam Champer
+
 import nose
 from free import free
 import arrow
@@ -15,6 +15,10 @@ day_range = [arrow.get("2017-11-21T00:00:00-08:00"),
 
 
 def output_format(times_list):
+    """
+    For formatting outputs from the free function.
+    For testing purposes.
+    """
     formatted_free_times = []
     for i in times_list:
         fmt_str = "{} to {}.".format(
@@ -24,11 +28,14 @@ def output_format(times_list):
     return formatted_free_times
 
 
-# free(e_list, op_hr, op_min, c_hr, c_min, day_range, min_len):
 def test_free_one():
+    """
+    Test to see if free time matches expectation when
+    we throw a single event into the daterange.
+    """
     events = [['Event', '2017-11-21T10:00:00-08:00', '2017-11-21T11:20:00-08:00']]
-    freetimes = free(events, 9, 0, 17, 0, day_range, 30)  #from 9 to 5.
-    fmt_freetime= output_format(freetimes)
+    freetimes, _ = free(events, 9, 0, 17, 0, day_range, 30)  # From 9 to 5.
+    fmt_freetime = output_format(freetimes)
     for i in fmt_freetime:
         print(i)
     assert fmt_freetime == ['Tue, Nov 21, 9:00 am to Tue, Nov 21, 10:00 am.',
@@ -42,7 +49,12 @@ def test_free_one():
 
 
 def test_nothing_fits():
-    freetimes = free([], 9, 0, 17, 0, day_range, 600)
+    """
+    Test a situation where we don't have any room to fit
+    a 10 hour long meeting, and make sure free correctly
+    doesn't give us any options.
+    """
+    freetimes, _ = free([], 9, 0, 17, 0, day_range, 600)
     fmt_freetime = output_format(freetimes)
     for i in fmt_freetime:
         print(i)
@@ -50,10 +62,13 @@ def test_nothing_fits():
 
 
 def test_overlap():
+    """
+    Test that free correctly handles overlapping events.
+    """
     events = [['Event', '2017-11-21T10:00:00-08:00', '2017-11-21T11:00:00-08:00'],
               ['Event', '2017-11-21T10:30:00-08:00', '2017-11-21T11:20:00-08:00']]
-    freetimes = free(events, 9, 0, 17, 0, day_range, 30)
-    fmt_freetime= output_format(freetimes)
+    freetimes, _ = free(events, 9, 0, 17, 0, day_range, 30)
+    fmt_freetime = output_format(freetimes)
     for i in fmt_freetime:
         print(i)
     assert fmt_freetime == ['Tue, Nov 21, 9:00 am to Tue, Nov 21, 10:00 am.',
@@ -67,6 +82,10 @@ def test_overlap():
 
 
 def test_shotgun():
+    """
+    Test to see that free times match those expected for a typical
+    situation where we have a bunch of events.
+    """
     events = [['Event', '2017-11-22T11:30:00-08:00', '2017-11-22T12:10:00-08:00'],
               ['Event', '2017-11-22T12:00:00-08:00', '2017-11-22T13:00:00-08:00'],
               ['Event', '2017-11-22T12:30:00-08:00', '2017-11-22T13:30:00-08:00'],
@@ -80,8 +99,8 @@ def test_shotgun():
               ['Event', '2017-11-28T12:00:00-08:00', '2017-11-28T13:00:00-08:00'],
               ['Event', '2017-11-28T14:00:00-08:00', '2017-11-28T15:00:00-08:00']]
 
-    freetimes = free(events, 9, 0, 17, 0, day_range, 30)
-    fmt_freetime= output_format(freetimes)
+    freetimes, _ = free(events, 9, 0, 17, 0, day_range, 30)
+    fmt_freetime = output_format(freetimes)
     print(fmt_freetime)
     for i in fmt_freetime:
         print(i)

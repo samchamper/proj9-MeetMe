@@ -74,10 +74,8 @@
 
 
 <script type="text/javascript">
-
-  var SCRIPT_ROOT = {{ request.script_root|tojson|safe }};
-  var NEXT_URL = SCRIPT_ROOT + "/_get_names";
-
+    var SCRIPT_ROOT = {{ request.script_root|tojson|safe }};
+    var NEXT_URL = SCRIPT_ROOT + "/_get_names";
 
     function add_invitee(){
     // Add additional invitee to the invitee table.
@@ -88,7 +86,6 @@
             "<td><input name='name' id='p_"+ id_no +"' type='text' size='15'/></td>" +
             "<td><input type='submit' value='Add' onclick='add_invitee()'></td></tr>";
   }
-
 
   function goto_join_page(){
     // Get all the names and other stuff, pass them over to the server,
@@ -103,25 +100,21 @@
     for (var i = 0; i < tab_len; i++){
         var cur_person = document.getElementById("p_" + i).value;
         if (cur_person != ""){
+            // Ignore input fields that were left blank.
             participants.push(cur_person)
         }
     }
     console.log("Got the following participants: ", participants);
     if (participants.length >= 1 && !isNaN(duration) && duration > 0){
         // Don't want to do actually go to the next page if list is empty.
+        // Or if someone entered something for duration that isn't a positive number.
         $.getJSON(NEXT_URL, {participants: JSON.stringify(participants),
                         desc: desc, duration: duration, daterange: daterange}, function(data){
              var meet_code = data.result.meetcode;
-             console.log("Routing to meet code:", meet_code);
+             console.log("Routing to join page for meet code:", meet_code);
              window.location.assign(SCRIPT_ROOT + meet_code + "/join");
         });
     }
-  }
-
-
-  $(document).ready(function(){onPageLoad();});
-
-  function onPageLoad(){
   }
 
 </script>

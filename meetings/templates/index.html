@@ -43,7 +43,7 @@
       <br /><br />
 
 
-    <h2>Calendars: </h2>
+<h2>Calendars: </h2>
 <!-- Table to be filled in by js functions -->
 <table class="cal_table" id="cal_table">
     <label> Select calendars from which to populate event table:  </label>
@@ -62,7 +62,8 @@
     <tbody>
     </tbody>
 </table>
-    <br /><br />
+<br /><br />
+
 <label><h2>Which meeting participant are you?</h2></label>
 <table class="people_table" id="people_table"></table>
 <br />
@@ -77,15 +78,18 @@ var POP_URL = SCRIPT_ROOT + "/_populate";
 var SEND_URL = SCRIPT_ROOT + "/_send";
 var REDIR_URL = SCRIPT_ROOT + "/_redir";
 
-// A global for busy times. Globals will be set in
+// A global for busy times. Global will be set in
 // the populate event table function and then sent
 // to the database in the send stuff to db function.
 var busy_times;
 
 function send_stuff_to_db(){
-    // Sends selected invitee, daterange,
+    // Sends selected invitee, date range,
     // and busy_times to python to send to the db.
+    // Then redirects to the status page for the meeting.
     console.log("Updating database...");
+    //Throws an error if no one is selected, which is fine.
+    // Prevents moving to the next page until selection is made.
     var invitee = document.querySelector('input[name="person"]:checked').value;
 
     $.getJSON(SEND_URL, {invitee: invitee,
@@ -98,7 +102,8 @@ function send_stuff_to_db(){
 }
 
 function redir(){
-    // Redirect to meeting status page.
+    // Redirect to meeting status page if you click to the
+    // join page which already has all participants responding.
     console.log("Redirecting...");
     $.getJSON(REDIR_URL, {}, function(data){
              var meet_code = data.result.meetcode;
@@ -122,19 +127,16 @@ function stuff_from_database(){
             // just redirect to the status page.
             redir()
         }
-
         document.getElementById("description").innerHTML = descript;
         document.getElementById("duration").innerHTML = duration + " minutes.";
-
+        // Populate table with radio button selectable list of invitees.
         var people_table = document.getElementById('people_table');
-
         for (var i = 0; i < participants.length; i++){
             people_table.insertRow().outerHTML = "<tr> <input type='radio' name='person' value='" +
                     participants[i] + "' id=p_'" + participants[i] + "> " + participants[i] +"<br/></tr>"
         }
     });
 }
-
 
 function populate_cal_table(){
     // Get a list of the google calendars.
@@ -144,22 +146,26 @@ function populate_cal_table(){
 
         var cal_tab = document.getElementById('cal_table');
         var num_cals = cals.length;
-        for (var i = 0; i < num_cals; i++) {
+        for (var i = 0; i < num_cals; i++){
+            // Fill the calendar table with the calendars and checkboxes.
+            // Also an invisible field to store the calendar's id.
             cal_tab.insertRow().outerHTML = "<tr class='the_row'> <input name='checkbox' type='checkbox' id='check" + i
                 + "'> " + cals[i].summary +
                 "<input name='value' id='calendar_number_" + i + "' value ='" + cals[i].summary +
                 "' readonly style='visibility:hidden'> </tr>";
         }
+        // When the calendars have been put on the page,
+        // populate the event table.
         populate_event_table();
     });
 }
-
 
 function populate_event_table(){
     // Populate the event table with events from the selected calendars.
     var cal_tab = document.getElementById('cal_table');
     var leng = cal_tab.rows.length;
-    chosen = [];
+    // Check the checkboxes to check which checks are checked.
+    var chosen = [];
     for (var i = 0; i < leng; i++){
         var chkname = "check" + i;
         var chk = document.getElementById(chkname);
@@ -169,16 +175,21 @@ function populate_event_table(){
             chosen.push(thiscal)
         }
     }
+    console.log("The following calendars have been selected: " + chosen);
     var open = document.getElementById('open').value;
     var close = document.getElementById('close').value;
-
-    console.log("The following calendars have been selected: " + chosen);
-    $.getJSON(EVENT_URL, {open: open, close: close, chosen: JSON.stringify(chosen)}, function(data){
+    $.getJSON(EVENT_URL, {open: open, close: close,
+                chosen: JSON.stringify(chosen)}, function(data){
         console.log("Populating event list.");
         var events = data.result.event_list;
         var free_times = data.result.formatted_free_times;
+        // Put the busy times in the global to pass back to
+        // other server function later.
         busy_times = data.result.db_ready_busy;
 
+        // Event table needs to be refreshed every time this function
+        // is called, since user may have unchecked a checkbox that
+        // had been checked before.
         var table = document.getElementById('event_table');
         while (table.firstChild) {
             table.removeChild(table.firstChild);
@@ -186,33 +197,33 @@ function populate_event_table(){
         var e_table = document.createElement('tbody');
         table.appendChild(e_table);
 
+        // Put the events in the table.
         var len = events.length;
         for (var i = 0; i < len; i++) {
+            // Each event has a description, open time, and close time.
+            // Then add some whitespace.
             e_table.insertRow().outerHTML = "<tr>" + events[i][0] + "<br />" +
-                events[i][1] + "<br />" + events[i][2] + "</tr>";
-            // Add some whitespace for legibility.
-            e_table.insertRow().outerHTML = "<tr><br /></tr>";
+                events[i][1] + "<br />" + events[i][2] + "</tr><tr><br /></tr>";
         }
-
-        // Now populate the table of free times
+        // Now populate the table of free times.
+        // First, clear old table.
         var table = document.getElementById('free_table');
-        while (table.firstChild) {
+        while (table.firstChild){
             table.removeChild(table.firstChild);
         }
         var f_table = document.createElement('tbody');
         table.appendChild(f_table);
 
+        // Add the free times to the table.
         var len = free_times.length;
         for (var i = 0; i < len; i++) {
-            f_table.insertRow().outerHTML = "<tr>" + free_times[i] + "</tr>";
-            // Add some whitespace for legibility.
-            f_table.insertRow().outerHTML = "<tr><br /></tr>";
+            f_table.insertRow().outerHTML = "<tr>" + free_times[i] + "</tr><tr><br /></tr>";
         }
     });
 }
 
 
-// Next line from
+// Next line from is a magic line from"
 // https://stackoverflow.com/questions/22234363/how-to-make-event-listener-for-changes-in-all-and-any-check-boxes-in-document-wi
 $(document).on('change', 'input[type=checkbox]', function(e) {
     populate_event_table();
@@ -243,7 +254,6 @@ $(document).ready(function(){
 });
 
 </script>
-
-  </div>  <!--for bootstrap-->
-  </body>
-  </html>
+</div>  <!--for bootstrap-->
+</body>
+</html>

@@ -1,3 +1,9 @@
+# Main file for MeetMe, an app to find free times in common
+# between a group of people (or robots or whatever)
+# in oder to schedule meetings.
+# Author: Sam Champer
+
+
 import flask
 from flask import render_template
 from flask import request
