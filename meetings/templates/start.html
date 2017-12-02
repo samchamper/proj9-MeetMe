@@ -52,7 +52,7 @@
     console.log("Checking meeting code against database.");
     var meet_code = document.getElementById('code').value;
     var error_field = document.getElementById('notes');
-    console.log("Got meet code from user:", code);
+    console.log("Got meet code from user:", meet_code);
     $.getJSON(CHECK_URL, {meet_code: meet_code}, function(data) {
          var err = data.result.error;
          if (err){

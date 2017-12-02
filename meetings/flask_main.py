@@ -9,7 +9,9 @@ from flask import render_template
 from flask import request
 import logging
 import sys
-import urllib
+
+# For converting strings to url format for mailto.
+from urllib import parse as url_parse
 
 # Date handling
 import arrow
@@ -29,7 +31,7 @@ from pymongo import MongoClient
 import random
 from string import ascii_letters as letters
 
-# My function to go from a list of events to a list of free times:
+# My functions to go from a list of events to a list of free times:
 from free import free, db_free
 
 ###
@@ -50,7 +52,6 @@ SCOPES = 'https://www.googleapis.com/auth/calendar.readonly'
 CLIENT_SECRET_FILE = CONFIG.GOOGLE_KEY_FILE
 APPLICATION_NAME = 'MeetMe class project'
 
-
 # Connect to mongo for database of meetings.
 MONGO_CLIENT_URL = "mongodb://{}:{}@{}:{}/{}".format(
     CONFIG.DB_USER,
@@ -70,15 +71,13 @@ except:
 
 
 #############################
-#  Pages (routed from URLs)
+# Pages and flask functions.
 #############################
 @app.route("/")
 @app.route("/start")
 @app.route("/index")
 def index():
     app.logger.debug("Entering start page")
-    if 'begin_date' not in flask.session:
-        init_session_values()
     return render_template('start.html')
 
 
@@ -92,8 +91,7 @@ def check():
         records.append(record['code'])
 
     if meet_code in records:
-        result = {"meet_code": meet_code}
-        return flask.jsonify(result=result)
+        return flask.jsonify(result={})
 
     result = {"error": "1"}
     return flask.jsonify(result=result)
@@ -102,13 +100,14 @@ def check():
 @app.route("/new_meeting")
 def new_meeting():
     # Get a new meeting code.
-    # The meeting codes are random strings of 12 ascii letters.
-    # It seems pretty unlikely that the same two codes will ever be generated,
-    # but this function double checks just in case.
+    # The meeting codes are random strings of 10 ascii letters.
+    # It seems pretty unlikely that the same two codes will  be generated
+    # any time soon, but this function double checks just in case.
     records = []
     for record in collection.find({"type": "meeting"}):
         records.append(record['code'])
 
+    meetcode = ''
     done = False
     while done is False:
         meetcode = ''.join(random.choice(letters) for _ in range(10))
@@ -118,6 +117,8 @@ def new_meeting():
     app.logger.debug("Adding new meeting to database with meet code: {}"
                      .format(meetcode))
 
+    # Add a new entry to the database with a field for
+    # everything we ever want to put in there.
     new = {"type": "meeting",
            "busy": [],
            "daterange": "None",
@@ -127,6 +128,7 @@ def new_meeting():
            "description": "None",
            "code": meetcode}
     collection.insert(new)
+    # The only thing we need to keep in the session is the meetcode.
     flask.session['meetcode'] = meetcode
     return render_template('new_meeting.html')
 
@@ -138,11 +140,11 @@ def get_names():
     the new meeting table, then reroute to the join meeting page.
     """
     people = request.args.get("participants")
-    app.logger.debug("Got this list of participants: {}".format(people))
-
     desc = str(request.args.get("desc"))
     duration = int(request.args.get("duration"))
     date_rng = request.args.get("daterange")
+
+    app.logger.debug("Got this list of participants: {}".format(people))
     app.logger.debug("Event description: {}".format(desc))
     app.logger.debug("Event duration: {}".format(duration))
     app.logger.debug("Date range: {}".format(date_rng))
@@ -153,7 +155,6 @@ def get_names():
     people.sort()
     # Add the people going to the event to the database.
     meetcode = flask.session['meetcode']
-
     collection.find_one_and_update(
         {"code": meetcode},
         {'$set': {"participants": people,
@@ -170,23 +171,13 @@ def get_names():
 @app.route("/<meetcode>/join")
 def join(meetcode):
     flask.session['meetcode'] = meetcode
-    if 'begin_date' not in flask.session:
-        init_session_values()
     # Need authorization to list calendars
     app.logger.debug("Checking credentials for Google calendar access")
     credentials = valid_credentials()
     if not credentials:
         app.logger.debug("Redirecting to authorization")
         return flask.redirect(flask.url_for('oauth2callback'))
-
-    gcal_service = get_gcal_service(credentials)
     app.logger.debug("Returned from get_gcal_service")
-    cal_list = list_calendars(gcal_service)
-
-    for i in cal_list:
-        i['selected'] = True
-
-    flask.g.calendars = cal_list
     return render_template('index.html')
 
 
@@ -213,45 +204,39 @@ def populate():
 
 @app.route("/_choose")
 def jsonchoose():
-    # Need authorization to list calendars
-    app.logger.debug("Checking credentials for Google calendar access")
+    # Need authorization to list calendars.
+    app.logger.debug("Checking credentials for Google calendar access.")
     credentials = valid_credentials()
     if not credentials:
-        app.logger.debug("Redirecting to authorization")
+        app.logger.debug("Redirecting to authorization.")
         return flask.redirect(flask.url_for('oauth2callback'))
 
     gcal_service = get_gcal_service(credentials)
     app.logger.debug("Returned from get_gcal_service")
+
     cal_list = list_calendars(gcal_service)
-
-    for i in cal_list:
-        i['selected'] = True
-    flask.g.calendars = cal_list
-
     result = {"cal_list": cal_list}
     return flask.jsonify(result=result)
 
 
 @app.route("/_events")
 def events():
-    app.logger.debug("Checking credentials for Google calendar access")
+    app.logger.debug("Checking credentials for Google calendar access.")
     credentials = valid_credentials()
     if not credentials:
-        app.logger.debug("Redirecting to authorization")
+        app.logger.debug("Redirecting to authorization.")
         return flask.redirect(flask.url_for('oauth2callback'))
 
     gcal_service = get_gcal_service(credentials)
     app.logger.debug("Returned from get_gcal_service")
-    cal_list = list_calendars(gcal_service)
 
-    for i in cal_list:
-        i['selected'] = True
-    flask.g.calendars = cal_list
+    cal_list = list_calendars(gcal_service)
 
     meetcode = flask.session['meetcode']
     # Get the record with this meet code.
     record = collection.find({"code": meetcode})[0]
 
+    # Get the stuff from the collection.
     duration = record['duration']
     daterange_parts = record['daterange'].split()
     begin_date = interpret_date(daterange_parts[0])
@@ -275,7 +260,7 @@ def events():
     close_hr = int(close_time[:2])
     close_min = int(close_time[-2:])
 
-    # Transfer from summary to cal id:
+    # Get ids of chosen calendars.
     chosen_ids = []
     for i in cal_list:
         if i['summary'] in chosen:
@@ -309,20 +294,21 @@ def events():
                 try:
                     e_finish = str(event['end']['dateTime'])
                 except KeyError:
-                    # All day events
+                    # For all day events
                     e_finish = arrow.get(event['end']['date']).replace(tzinfo='local').isoformat()
 
+                # Each event has three elements: summary, start time, and finish time.
                 this_event = [str(event['summary']), e_start, e_finish]
+                # For repeated events:
                 if this_event not in event_list:
                     event_list.append(this_event)
 
     # Sort the event list.
     event_list.sort(key=lambda el: arrow.get(el[1]))
 
-    # Now pass all the necessary args to the function to calculate freetime:
-    min_len = int(duration)
-    # free_windows = []
-    free_windows, db_ready_busy = free(event_list, open_hr, open_min, close_hr, close_min, day_range, min_len)
+    # Now pass all the necessary args to the function to calculate free time:
+    free_windows, db_ready_busy = free(event_list, open_hr, open_min, close_hr, close_min, day_range, duration)
+
     # Free windows is a list of pairs of arrow objects
     # representing open and close time of a window of free time.
 
@@ -333,12 +319,7 @@ def events():
                          "End time: {}".format(arrow.get(event_list[i][2]).format('ddd, MMM D, h:mm a'))]
 
     # Display formatting for list of free times.
-    formatted_free_times = []
-    for window in free_windows:
-        win_str = "From {} to {}.".format(
-            window[0].format('ddd, MMM D, h:mm a'),
-            window[1].format('h:mm a'))
-        formatted_free_times.append(win_str)
+    formatted_free_times = format_free_times(free_windows)
 
     # Return final list and free time list to js for displaying.
     result = {"event_list": event_list, "formatted_free_times": formatted_free_times, "db_ready_busy": db_ready_busy}
@@ -348,8 +329,7 @@ def events():
 @app.route("/_send")
 def send():
     """
-    Function to update the database with the person who is
-    responding and their busy times.
+    Updates the database with the person who is responding and their busy times.
     """
     invitee = request.args.get('invitee')
     busy_times = request.args.get('busy_times')
@@ -362,8 +342,8 @@ def send():
     if "{}".format(invitee) in record['participants']:
         # The invitee should always be in the record unless
         # users are doing something wrong, like multiple people
-        # choosing the same name at the same time. This if covers
-        # that case.
+        # choosing the same name at the same time.
+        # Either way, this if statement protects in that case.
         record['participants'].remove("{}".format(invitee))
         record['already_checked_in'].append("{}".format(invitee))
 
@@ -391,18 +371,17 @@ def redir():
     Redirect to meeting status page.
     """
     meetcode = flask.session['meetcode']
-    result = {"meetcode": meetcode}
-    return flask.jsonify(result=result)
+    return flask.jsonify(result={"meetcode": meetcode})
 
 
 @app.route("/<meetcode>/<meetcode2>/status")
-def status_redir(meetcode,meetcode2):
+def status_redir(meetcode, meetcode2):
     """
     Function to correct super weird buggy behaviour
     of window.location.assign in js.
     I have no idea why the following js:
-    window.location.assign(SCRIPT_ROOT + meeting_code + "/status");
-    is routing me to "/<meetcode>/<meetcode2>/status".
+        window.location.assign(SCRIPT_ROOT + meeting_code + "/status");
+    is routing me to "/<meetcode>/<meetcode>/status".
     meetcode is in js properly, as determined by console logging.
     For now, this trashy redirect function fixes the problem.
     """
@@ -418,6 +397,7 @@ def status(meetcode):
     app.logger.debug("Entering meeting status page")
     return render_template('status.html')
 
+
 @app.route("/_pull_info")
 def pull_info():
     """
@@ -429,7 +409,7 @@ def pull_info():
     # Get the record with this meet code.
     record = collection.find({"code": meetcode})[0]
 
-    # Get the range of days from the db
+    # Get the range of days from the db.
     daterange_parts = record['daterange'].split()
     begin_date = interpret_date(daterange_parts[0])
     end_date = interpret_date(daterange_parts[2])
@@ -438,30 +418,26 @@ def pull_info():
     day_range = arrow.Arrow.range('day', begin, end)
 
     # Calc free times based on everyone's busy times:
-    free = db_free(record["busy"], day_range, int(record["duration"]))
+    free = db_free(record["busy"], day_range, record["duration"])
 
     # Format the free times
-    formatted_free_times = []
-    for free_time in free:
-        free_str = "From {} to {}.".format(
-            free_time[0].format('ddd, MMM D, h:mm a'),
-            free_time[1].format('h:mm a'))
-        formatted_free_times.append(free_str)
+    formatted_free_times = format_free_times(free)
 
     # Generate a string to place into html as a mailto link.
     # Wow is this ugly. Python is really not a word processor I guess:
     mail_str = "<a href='mailto:recipient?subject=Join%20the%20meeting!&amp;body="
-    mail_str += urllib.parse.quote(record['description'])
+    mail_str += url_parse.quote(record['description'])
     mail_str += "%0A%0ATo%20join%20the%20meeting%20go%20to" \
                 "%3A%0Awherever_MeetMe_is_hosted%2F" + meetcode + "%2Fjoin"
     mail_str += "%0ATo%20check%20the%20status%20of%20the%20meeting%2C%20go%20to" \
                 "%3A%0Awherever_MeetMe_is_hosted%2F" + meetcode + "%2Fstatus"
-    mail_str += urllib.parse.quote("\n\nIf MeetMe isn't hosted, you'll have to go hardcore and install it!\n To do so, " \
-                "open a command prompt or terminal in the folder you want to install it, then you'll need to have" \
-                " git installed and then to run:\ngit clone https://github.com/samchamper/proj9-MeetMe.git\n\n" \
-                "Then you'll need to place a credentials file and Google calendar access token " \
-                "in proj9-MeetMe/meetings \nThen from the proj9-MeetMe directory run:\nmake run\n" \
-                "Now you use MeetMe by navigating to http://localhost:8000/")
+    mail_str += url_parse.quote(
+        "\n\nIf MeetMe isn't hosted, you'll have to go hardcore and install it!\n To do so, "
+        "open a command prompt or terminal in the folder you want to install it, then you'll need to have"
+        " git installed and then to run:\ngit clone https://github.com/samchamper/proj9-MeetMe.git\n\n"
+        "Then you'll need to place a credentials file and Google calendar access token "
+        "in proj9-MeetMe/meetings \nThen from the proj9-MeetMe directory run:\nmake run\n"
+        "Now you use MeetMe by navigating to http://localhost:8000/")
     mail_str += "'>Send an invitation to the meeting!</a>"
 
     result = {"description": record['description'],
@@ -503,7 +479,7 @@ def pull_info():
 def valid_credentials():
     """
     Returns OAuth2 credentials if we have valid
-    credentials in the session.  This is a 'truthy' value.
+    credentials in the session. This is a 'truthy' value.
     Return None if we don't have credentials, or if they
     have expired or are otherwise invalid.  This is a 'falsy' value.
     """
@@ -522,11 +498,11 @@ def valid_credentials():
 def get_gcal_service(credentials):
     """
     We need a Google calendar 'service' object to obtain
-    list of calendars, busy times, etc.  This requires
+    list of calendars, busy times, etc. This requires
     authorization. If authorization is already in effect,
     we'll just return with the authorization. Otherwise,
     control flow will be interrupted by authorization, and we'll
-    end up redirected back to /choose *without a service object*.
+    end up redirected *without a service object*.
     Then the second call will succeed without additional authorization.
     """
     app.logger.debug("Entering get_gcal_service")
@@ -580,7 +556,7 @@ def oauth2callback():
 
 #####
 #  Option setting:  Buttons or forms that add some
-#     information into session state.  Don't do the
+#     information into session state. Don't do the
 #     computation here; use of the information might
 #     depend on what other information we have.
 #   Setting an option sends us back to the main display
@@ -731,6 +707,19 @@ def cal_sort_key(cal):
     else:
         primary_key = "X"
     return primary_key, selected_key, cal["summary"]
+
+
+def format_free_times(free_time_list):
+    """
+    Format a list of free times for display purposes.
+    """
+    formatted_free_times = []
+    for free_time in free_time_list:
+        free_str = "From {} to {}.".format(
+            free_time[0].format('ddd, MMM D, h:mm a'),
+            free_time[1].format('h:mm a'))
+        formatted_free_times.append(free_str)
+    return formatted_free_times
 
 
 #################
