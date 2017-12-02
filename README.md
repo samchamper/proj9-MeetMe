@@ -8,10 +8,11 @@ Uses some code from Michal Young.
 
 ## About:
 Here is a list of some features and bugs that I hereby allege to be features.  
-Main features:
+Main things:
 - This app is mostly democratic. The host of the event has the right to set certain initial values (event description, participant list, date range, and event duration), but otherwise is the host is not distinguished from other users.
 - The app collects only anonymised, non-labeled event times from user calendars. Event details, other than times, are never stored in anything but temporary RAM. Events are stored in a database with only start and end times, not with titles. Additionally, events stored in the database are not associated with any specific user: events for all users are co-mingled. After submitting events, even the submitter of a list of events cannot see which times are unavailable because of their events specifically.
 - Consequently, this app meets a high standard in terms of preservation of user data confidentiality. Other users may be able to make inferences about one another's schedules, especially for meetings with few people.
+- The calendars and events list populate via AJAX. On one hand, this is cool. On the other, it can take quite a while to populate the lists, especially if a lot of calendars are checked. Since this process uses AJAX, it is not immediately apparant to users that the page is loading, so it may appear that the page is simply non-responsive. Some kind of loading indicator would be first on my list of features to add.  
 
 Minor notes:
 - Users attempting to join meetings where all users have already responded will be routed to the status page for the meeting.

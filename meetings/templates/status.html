@@ -91,7 +91,12 @@ function get_stuff_from_database(){
         for (var i = 0; i < pending.length; i++){
             pending_table.insertRow().outerHTML = "<tr><ul><li>" + pending[i] + "</ul></li></tr>"
         }
+
         var free_table = document.getElementById('free_table');
+        if (free.length == 0){
+            free_table.insertRow().outerHTML = "<tr><ul><li>It looks like your group doesn't have any " +
+                "mutual free time! Too bad! Try another meeting with different paramaters.</ul></li></tr>"
+        }
         for (var i = 0; i < free.length; i++){
             free_table.insertRow().outerHTML = "<tr><ul><li>" + free[i] + "</ul></li></tr>"
         }
