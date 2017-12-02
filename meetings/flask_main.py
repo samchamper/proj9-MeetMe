@@ -554,70 +554,11 @@ def oauth2callback():
         return flask.redirect(flask.url_for('join', meetcode=flask.session['meetcode']))
 
 
-#####
-#  Option setting:  Buttons or forms that add some
-#     information into session state. Don't do the
-#     computation here; use of the information might
-#     depend on what other information we have.
-#   Setting an option sends us back to the main display
-#      page, where we may put the new information to use.
-#####
-@app.route('/setrange', methods=['POST'])
-def setrange():
-    """
-    NO LONGER USED
-    User chose a date range with the bootstrap daterange
-    widget.
-    """
-    # TODO : DELETE
-    app.logger.debug("Entering setrange")
-    flask.flash("Setrange gave us '{}'".format(request.form.get('daterange')))
-    daterange = request.form.get('daterange')
-
-    op_time = request.form.get('open')
-    close_time = request.form.get('close')
-
-    flask.session['daterange'] = daterange
-    flask.session['begin_time'] = op_time
-    flask.session['end_time'] = close_time
-    daterange_parts = daterange.split()
-
-    app.logger.debug(op_time)
-    app.logger.debug(close_time)
-
-    flask.session['begin_date'] = interpret_date(daterange_parts[0])
-    flask.session['end_date'] = interpret_date(daterange_parts[2])
-
-    app.logger.debug("Setrange parsed {} - {}  dates as {} - {}".format(
-        daterange_parts[0], daterange_parts[1],
-        flask.session['begin_date'], flask.session['end_date']))
-
-    return flask.redirect(flask.url_for('join', meetcode=flask.session['meetcode']))
-
-
-####
-#   Initialize session variables
-####
-def init_session_values():
-    """
-    Start with some reasonable defaults for date and time ranges.
-    Note this must be run in app context ... can't call from main.
-    """
-    # TODO: DELETE THIS FUNCTION
-    # Default date span = tomorrow to 1 week from now
-    now = arrow.now('local')     # We really should be using tz from browser
-    tomorrow = now.replace(days=+1)
-    nextweek = now.replace(days=+7)
-    flask.session["begin_date"] = tomorrow.floor('day').isoformat()
-    flask.session["end_date"] = nextweek.ceil('day').isoformat()
-    flask.session["daterange"] = "{} - {}".format(
-        tomorrow.format("MM/DD/YYYY"),
-        nextweek.format("MM/DD/YYYY"))
-    # Default time span
-    flask.session["begin_time"] = "09:00"
-    flask.session["end_time"] = "17:00"
-
-
+# ###############
+#
+# Non-page functions
+#
+# ###############
 def interpret_time(text):
     """
     Read time in a human-compatible format and
@@ -629,7 +570,8 @@ def interpret_time(text):
     time_formats = ["ha", "h:mma",  "h:mm a", "H:mm"]
     try:
         as_arrow = arrow.get(text, time_formats).replace(tzinfo=tz.tzlocal())
-        as_arrow = as_arrow.replace(year=2016)  # HACK see below
+        # Workaround for raspberry Pi because isoformat doesn't work on some dates:
+        as_arrow = as_arrow.replace(year=2016)
         app.logger.debug("Succeeded interpreting time")
     except:
         app.logger.debug("Failed to interpret time")
@@ -637,7 +579,6 @@ def interpret_time(text):
                     .format(text))
         raise
     return as_arrow.isoformat()
-    # HACK #Workaround for raspberry Pi because isoformat doesn't work on some dates.
 
 
 def interpret_date(text):
@@ -661,13 +602,10 @@ def next_day(isotext):
     return as_arrow.replace(days=+1).isoformat()
 
 
-####
-#  Functions (NOT pages) that return some information
-####
 def list_calendars(service):
     """
     Given a google 'service' object, return a list of
-    calendars.  Each calendar is represented by a dict.
+    calendars. Each calendar is represented by a dict.
     The returned list is sorted to have
     the primary calendar first, and selected (that is, displayed in
     Google Calendars web app) calendars before unselected calendars.
@@ -722,32 +660,8 @@ def format_free_times(free_time_list):
     return formatted_free_times
 
 
-#################
-# Functions used within the templates
-#################
-@app.template_filter('fmtdate')
-def format_arrow_date(date):
-    try:
-        normal = arrow.get(date)
-        return normal.format("ddd MM/DD/YYYY")
-    except:
-        return "(bad date)"
-
-
-@app.template_filter('fmttime')
-def format_arrow_time(time):
-    try:
-        normal = arrow.get(time)
-        return normal.format("HH:mm")
-    except:
-        return "(bad time)"
-
-#############
-
-
 if __name__ == "__main__":
     # App is created above so that it will
     # exist whether this is 'main' or not
     # (e.g., if we are running under green unicorn)
     app.run(port=CONFIG.PORT, host="localhost")
-    # app.run(port=CONFIG.PORT,host="0.0.0.0")
