@@ -1,10 +1,9 @@
 # MeetMe
-A web app designed to help groups of people coordinate common available free time in order to schedule meetings.  
+A simple web app designed to help groups of people coordinate common available free time in order to schedule meetings.  
 
 ## Author:
 Sam Champer  
-schampe2@uoregon.edu  
-Uses some code from Michal Young.  
+Using some code from Michal Young.  
 
 ## About:
 Here is a list of some features and bugs that I hereby allege to be features.  
@@ -16,7 +15,7 @@ Main things:
 
 Minor notes:
 - Users attempting to join meetings where all users have already responded will be routed to the status page for the meeting.
-- The app doesn't actively do anything after all users have responded. E.g., there is no special process for notifying users that everyone has responded. Users will have to check for themselves and then use some method of communication to determine which block of free time they want to schedule in. The app doesn't brush your teeth for you either.
+- The app doesn't actively do anything after all users have responded. E.g., there is no special process for notifying users that everyone has responded. Users will have to check for themselves and then use some method of communication to determine which block of free time they want to schedule in.
 
 ## Usage
 
